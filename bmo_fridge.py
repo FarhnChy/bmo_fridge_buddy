@@ -47,7 +47,7 @@ EXPIRING_SOON_DAYS = 3
 
 # Open Food Facts asks API users to send a custom User-Agent. Replace the
 # contact text later with your GitHub repo URL or email once the repo exists.
-OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (learning project)"
+OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/FarhnChy/bmo_fridge_buddy)"
 OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
 
 
