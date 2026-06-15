@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+
+# Local generated project data
+fridge.db
+temperature_log.csv
+
+# Local environments and editor files
+.venv/
+venv/
+.env
+.idea/
+.vscode/
