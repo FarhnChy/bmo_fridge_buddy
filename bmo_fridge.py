@@ -20,6 +20,8 @@ program flow before wiring anything.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import csv
 import json
 import sqlite3
@@ -44,9 +46,10 @@ DISPLAY_REFRESH_SECONDS = 2
 TEMPERATURE_LOG_SECONDS = 10
 EXPIRATION_CHECK_SECONDS = 30
 EXPIRING_SOON_DAYS = 3
+FRIDGE_MIN_F = 32.0
+FRIDGE_MAX_F = 40.0
 
-# Open Food Facts asks API users to send a custom User-Agent. Replace the
-# contact text later with your GitHub repo URL or email once the repo exists.
+# Open Food Facts asks API users to send a custom User-Agent with contact info.
 OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/FarhnChy/bmo_fridge_buddy)"
 OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
 
@@ -117,6 +120,7 @@ class BmoDisplay:
         else:
             temperature_f = (temperature * (9/5)) + 32
             temp_text = f"{temperature_f:.1f} F"
+        temp_status = classify_temperature_status(temperature)
         message = str(state["last_message"])[:22]
         inventory_count = state["inventory_count"]
         expiring_count = state["expiring_count"]
@@ -124,7 +128,7 @@ class BmoDisplay:
         if not self.hardware_ready:
             print(
                 f"[BMO] temp={temp_text} items={inventory_count} "
-                f"expiring={expiring_count} msg={message}"
+                f"expiring={expiring_count} status={temp_status} msg={message}"
             )
             return
 
@@ -140,7 +144,7 @@ class BmoDisplay:
         self.draw.rectangle((98, 8, 120, 26), outline=255, fill=0)
         self.draw.arc((44, 12, 84, 42), 20, 160, fill=255)
 
-        self.draw.text((0, 36), f"Temp: {temp_text}", font=self.font, fill=255)
+        self.draw.text((0, 36), f"{temp_text} {temp_status}", font=self.font, fill=255)
         self.draw.text((0, 46), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
         self.draw.text((0, 56), message, font=self.font, fill=255)
 
@@ -148,9 +152,10 @@ class BmoDisplay:
         self.display.show()
 
 
-def connect_db() -> sqlite3.Connection:
+@contextmanager
+def connect_db() -> Iterator[sqlite3.Connection]:
     """
-    Return a new database connection.
+    Yield a database connection and always close it afterward.
 
     Each function opens its own connection so the scanner thread and display
     loop do not share the same SQLite connection object.
@@ -158,7 +163,14 @@ def connect_db() -> sqlite3.Connection:
 
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
-    return connection
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def init_db() -> None:
@@ -258,6 +270,18 @@ def count_inventory() -> int:
     with connect_db() as connection:
         row = connection.execute("SELECT COALESCE(SUM(quantity), 0) AS total FROM inventory").fetchone()
         return int(row["total"])
+
+
+def classify_temperature_status(temperature_c: float | None) -> str:
+    if temperature_c is None:
+        return "No sensor"
+
+    temperature_f = (temperature_c * (9 / 5)) + 32
+    if temperature_f < FRIDGE_MIN_F:
+        return "Too Cold!"
+    if temperature_f > FRIDGE_MAX_F:
+        return "Too Warm!"
+    return "Normal"
 
 
 def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:

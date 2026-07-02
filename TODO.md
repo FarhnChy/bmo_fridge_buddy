@@ -1,125 +1,95 @@
-# BMO Fridge Project TODO
+# BMO Fridge Buddy TODO
 
-Due today: 2026-06-15
+Updated: 2026-07-02
+Hardware pickup target: 2026-07-03
 
-## 1. Create and Connect the GitHub Repo
+## Current Status
 
-- [ ] Create a new empty GitHub repository for this project.
-- [ ] Copy the repo URL.
-- [ ] Initialize Git locally:
+- [x] Main app exists in `bmo_fridge.py`.
+- [x] Local terminal fallback works when OLED/sensor hardware is unavailable.
+- [x] SQLite inventory support is implemented.
+- [x] Open Food Facts barcode lookup is implemented.
+- [x] Temperature CSV logging is implemented.
+- [x] Expiring-soon inventory checks are implemented.
+- [x] Raspberry Pi OLED dependencies are listed in `requirements-rpi.txt`.
+- [x] Generated files are ignored by Git.
 
-```bash
-git init
-git branch -M main
-```
+## Before Getting Hardware
 
-- [ ] Confirm generated local files are ignored:
+- [ ] Confirm parts list:
+  - Raspberry Pi 4 or compatible Raspberry Pi
+  - microSD card with Raspberry Pi OS
+  - Pi power supply
+  - 0.96 inch SSD1306 I2C OLED display, 128x64
+  - waterproof DS18B20 temperature sensor
+  - 4.7k ohm resistor for the DS18B20 data line
+  - breadboard or wire connectors
+  - jumper wires
+  - USB barcode scanner that works as keyboard input
+  - mini fridge or test cooler
+- [ ] Make sure the OLED is the I2C version, not the SPI-only version.
+- [ ] Make sure the DS18B20 is the digital 1-Wire sensor, not an analog
+  temperature sensor.
 
-```bash
-git status --short
-```
+## Raspberry Pi Setup
 
-Expected: `fridge.db`, `temperature_log.csv`, and `__pycache__/` should not appear.
-
-- [ ] Make the first commit:
-
-```bash
-git add .gitignore README.md CODEX.md bmo_fridge.py requirements-rpi.txt TODO.md
-git commit -m "Create BMO fridge monitor project"
-```
-
-- [ ] Connect the local repo to GitHub:
-
-```bash
-git remote add origin <your-github-repo-url>
-git push -u origin main
-```
-
-## 2. Update Project Identity
-
-- [ ] Replace the placeholder Open Food Facts user agent contact text in `bmo_fridge.py` after the GitHub repo exists.
-- [ ] Add the actual GitHub repo URL to `README.md`.
-- [ ] Fix broken special characters in `README.md` and `CODEX.md` if punctuation or degree symbols display incorrectly.
-
-## 3. Local Software Check
-
-- [ ] Run the syntax check:
-
-```bash
-python -m py_compile bmo_fridge.py
-```
-
-- [ ] Run the app locally:
-
-```bash
-python bmo_fridge.py
-```
-
-- [ ] Test these commands in terminal mode:
-  - [ ] `help`
-  - [ ] `list`
-  - [ ] scan/type a barcode
-  - [ ] enter an expiration date as `YYYY-MM-DD`
-  - [ ] `expiring`
-  - [ ] `remove <barcode>`
-  - [ ] `quit`
-
-- [ ] Confirm `fridge.db` and `temperature_log.csv` are created locally but still ignored by Git.
-
-## 4. Raspberry Pi Setup
-
-- [ ] Copy or clone the repo onto the Raspberry Pi.
-- [ ] Install dependencies on the Pi:
+- [ ] Clone or copy this repo onto the Raspberry Pi.
+- [ ] Install dependencies:
 
 ```bash
 python -m pip install -r requirements-rpi.txt
 ```
 
-- [ ] Enable I2C for the SSD1306 OLED display.
-- [ ] Enable 1-Wire for the DS18B20 temperature sensor.
-- [ ] Reboot the Pi after enabling hardware interfaces.
-- [ ] Confirm the DS18B20 appears under `/sys/bus/w1/devices/28-*/w1_slave`.
-- [ ] Run the app on the Pi and confirm it does not fall back to terminal-only display mode.
+- [ ] Enable I2C for the OLED.
+- [ ] Enable 1-Wire for the DS18B20.
+- [ ] Reboot after enabling hardware interfaces.
+- [ ] Confirm the temperature sensor appears at:
 
-## 5. Hardware Verification
+```text
+/sys/bus/w1/devices/28-xxxxxxxxxxxx/w1_slave
+```
 
-- [ ] Confirm the OLED shows:
-  - [ ] BMO face
-  - [ ] temperature
-  - [ ] item count
-  - [ ] expiring-soon count
-  - [ ] status message
+## Hardware Test
 
-- [ ] Confirm the temperature reading changes and logs to `temperature_log.csv`.
-- [ ] Confirm the USB barcode scanner types a barcode and presses Enter automatically.
-- [ ] Confirm a scanned item is saved to SQLite.
-- [ ] Confirm removing an item updates the quantity or deletes the row.
-
-## 6. Final Proof for Submission
-
-- [ ] Take a photo or short video of the wired hardware running.
-- [ ] Take a screenshot of the GitHub repo with the committed files.
-- [ ] Take a screenshot or terminal output showing the app running.
-- [ ] Make one final commit if README or code changed:
+- [ ] Run the app on the Pi:
 
 ```bash
-git add README.md CODEX.md bmo_fridge.py TODO.md
-git commit -m "Document setup and finish project checklist"
+python bmo_fridge.py
+```
+
+- [ ] Confirm the OLED shows the BMO-style face.
+- [ ] Confirm the OLED shows temperature in Fahrenheit.
+- [ ] Confirm temperature status changes correctly:
+  - `Normal` from 32 F through 40 F
+  - `Too Cold!` below 32 F
+  - `Too Warm!` above 40 F
+  - `No sensor` when no sensor is detected
+- [ ] Confirm `temperature_log.csv` is created and receives readings.
+- [ ] Confirm the barcode scanner types the barcode and presses Enter.
+- [ ] Scan one item and enter an expiration date.
+- [ ] Run `list` and confirm the item appears.
+- [ ] Run `expiring` and confirm expiring items appear when expected.
+- [ ] Run `remove <barcode>` and confirm the quantity updates.
+
+## Final Submission Check
+
+- [ ] Check changed files:
+
+```bash
+git status --short
+```
+
+- [ ] Do not commit generated runtime files:
+  - `fridge.db`
+  - `temperature_log.csv`
+  - `__pycache__/`
+- [ ] Commit final project files:
+
+```bash
+git add README.md CODEX.md TODO.md bmo_fridge.py requirements-rpi.txt
+git commit -m "Finish BMO fridge buddy project"
 git push
 ```
 
-## Must Be Done Today
-
-- [ ] GitHub repo created.
-- [ ] Local project committed and pushed.
-- [ ] Placeholder repo/contact text updated.
-- [ ] Local terminal test completed.
-- [ ] README cleaned up enough for someone else to run the project.
-
-## Can Move Past Today If Hardware Is Not Ready
-
-- [ ] Raspberry Pi dependency install.
-- [ ] OLED display test.
-- [ ] DS18B20 sensor test.
-- [ ] Barcode scanner test on the Pi.
-- [ ] Final hardware demo photo/video.
+- [ ] Take a photo or short video of the wired project running.
+- [ ] Save terminal output or a screenshot showing the app running.
