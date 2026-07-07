@@ -1,35 +1,30 @@
 # BMO Fridge Buddy
 
-BMO Fridge Buddy is a Raspberry Pi mini-fridge monitor with a small BMO-style
-OLED status screen.
+BMO Fridge Buddy is a Raspberry Pi mini-fridge project inspired by BMO from
+Adventure Time.
 
-It reads fridge temperature from a DS18B20 sensor, shows the current status on
-an SSD1306 I2C OLED, tracks scanned food inventory in SQLite, and writes
-temperature history to a CSV file.
+The goal is to read the actual temperature inside a mini fridge, show a small
+BMO-style face and status screen, and keep a simple inventory of fridge items
+with expiration dates.
 
-GitHub repo: https://github.com/FarhnChy/bmo_fridge_buddy
+The project uses:
 
-## What It Does
+- a Raspberry Pi
+- a DS18B20 temperature sensor
+- an SSD1306 I2C OLED screen
+- a USB barcode scanner
+- SQLite for local inventory
+- CSV logging for temperature history
 
-- Shows a BMO-style face and fridge status on a 128x64 OLED screen.
-- Reads temperature from a waterproof DS18B20 sensor when connected.
-- Labels the fridge as `Normal`, `Too Cold!`, `Too Warm!`, or `No sensor`.
-- Lets a USB barcode scanner add items by typing a barcode and pressing Enter.
-- Looks up scanned products through the Open Food Facts API.
-- Stores inventory in `fridge.db`.
-- Logs temperature readings to `temperature_log.csv`.
-- Runs in terminal mode on a regular computer when Raspberry Pi hardware is not
-  connected.
+The main app lives in `bmo_fridge.py`.
 
-## Main File
-
-The app runs from:
+Run it on your computer first:
 
 ```bash
 python bmo_fridge.py
 ```
 
-Terminal/scanner commands:
+The app supports these commands:
 
 ```text
 <barcode>           scan/add an item
@@ -40,23 +35,8 @@ help                show commands
 quit                stop the program
 ```
 
-## Raspberry Pi Setup
+If the Raspberry Pi OLED libraries or temperature sensor are not available, the
+app runs in terminal mode so the inventory, barcode input, and database logic
+can still be tested.
 
-Install the Pi display dependencies:
-
-```bash
-python -m pip install -r requirements-rpi.txt
-```
-
-The OLED uses I2C through the Pi SDA/SCL pins. The DS18B20 uses Raspberry Pi OS
-1-Wire support and should appear at a path like:
-
-```text
-/sys/bus/w1/devices/28-xxxxxxxxxxxx/w1_slave
-```
-
-Generated runtime files are ignored by Git:
-
-- `fridge.db`
-- `temperature_log.csv`
-- `__pycache__/`
+Setup notes and the remaining project checklist are in `todo.md`.

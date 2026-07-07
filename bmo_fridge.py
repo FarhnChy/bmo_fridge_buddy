@@ -54,6 +54,10 @@ OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/Farhn
 OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
 
 
+def celsius_to_fahrenheit(temperature_c: float) -> float:
+    return (temperature_c * (9 / 5)) + 32
+
+
 @dataclass
 class AppState:
     """Small shared state object for the display loop and scanner thread."""
@@ -118,7 +122,7 @@ class BmoDisplay:
         if temperature is None:
             temp_text = "--.- F"
         else:
-            temperature_f = (temperature * (9/5)) + 32
+            temperature_f = celsius_to_fahrenheit(temperature)
             temp_text = f"{temperature_f:.1f} F"
         temp_status = classify_temperature_status(temperature)
         message = str(state["last_message"])[:22]
@@ -276,7 +280,7 @@ def classify_temperature_status(temperature_c: float | None) -> str:
     if temperature_c is None:
         return "No sensor"
 
-    temperature_f = (temperature_c * (9 / 5)) + 32
+    temperature_f = celsius_to_fahrenheit(temperature_c)
     if temperature_f < FRIDGE_MIN_F:
         return "Too Cold!"
     if temperature_f > FRIDGE_MAX_F:
@@ -385,7 +389,11 @@ def read_temperature_c() -> float | None:
     if temperature_index == -1:
         return None
 
-    milli_celsius = int(lines[1][temperature_index + len(marker) :])
+    try:
+        milli_celsius = int(lines[1][temperature_index + len(marker) :])
+    except ValueError:
+        return None
+
     return milli_celsius / 1000.0
 
 
@@ -481,9 +489,11 @@ def scanner_listener(state: AppState) -> None:
 
 def update_counts(state: AppState) -> None:
     expiring_items = get_expiring_items()
+    inventory_count = count_inventory()
+
     with state.lock:
         state.expiring_count = len(expiring_items)
-        state.inventory_count = count_inventory()
+        state.inventory_count = inventory_count
 
     if expiring_items:
         first = expiring_items[0]
