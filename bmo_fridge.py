@@ -1,10 +1,4 @@
 """
-BMO Fridge Buddy
-================
-
-This file is the main program for the Raspberry Pi mini fridge screen buddy.
-It is intentionally written as one readable script while you are learning.
-
 What it does:
 - Reads fridge temperature from a DS18B20 sensor when running on a Raspberry Pi.
 - Shows a small BMO-style status screen on an SSD1306 I2C OLED when available.
@@ -12,10 +6,6 @@ What it does:
 - Logs temperature history to CSV.
 - Lets a USB barcode scanner act like keyboard input.
 - Looks up product names with the Open Food Facts API.
-
-The script also runs on a normal computer without the Pi hardware. In that case
-it falls back to terminal output so you can practice the database, API, and
-program flow before wiring anything.
 """
 
 from __future__ import annotations
@@ -425,7 +415,20 @@ def print_help() -> None:
 
 def handle_barcode_scan(barcode: str, state: AppState) -> None:
     product_name = fetch_product_name(barcode)
-    expires_on = parse_expiration_date(input("Expiration date YYYY-MM-DD, or blank: "))
+
+    while True:
+        try:
+            raw_expiration = input("Expiration date YYYY-MM-DD, or blank: ")
+        except EOFError:
+            with state.lock:
+                state.last_message = "Input closed"
+                state.stop_requested = True
+            return
+
+        expires_on = parse_expiration_date(raw_expiration)
+        if not raw_expiration.strip() or expires_on is not None:
+            break
+
     message = add_or_update_item(barcode, product_name, expires_on)
     print(message)
     state.set_message(message)
@@ -444,7 +447,9 @@ def scanner_listener(state: AppState) -> None:
         try:
             raw_command = input("scan> ").strip()
         except EOFError:
-            state.set_message("Input closed")
+            with state.lock:
+                state.last_message = "Input closed"
+                state.stop_requested = True
             return
 
         if not raw_command:
