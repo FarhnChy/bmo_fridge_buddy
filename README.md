@@ -1,88 +1,148 @@
-## How This Project Was Built
+# BMO Fridge Buddy
 
-This project was built with a learn-first approach. Rather than copying
-boilerplate code, every section was written with a clear understanding of
-why each decision was made. Below is a breakdown of the key concepts behind
-each part of the codebase so anyone reading this — including future me —
-understands the reasoning.
+BMO Fridge Buddy turns a Raspberry Pi 4 into a mini-fridge monitor. It reads a
+DS18B20 temperature probe, shows status on a 128x64 SSD1306 I2C OLED, logs
+temperatures to CSV, and tracks barcode-scanned food in SQLite.
 
----
+Repository: https://github.com/FarhnChy/bmo_fridge_buddy
 
-### Why Python?
-Python is the standard language for Raspberry Pi projects because it has
-mature libraries for GPIO hardware control, sensor reading, and I2C display
-communication. It also has SQLite and threading built into its standard
-library meaning fewer external dependencies.
+## Before connecting hardware
 
----
+- Shut the Pi down and unplug USB-C power before moving GPIO wires.
+- The GPIO pins are **3.3 V logic** and are not 5 V tolerant. Never put 5 V on
+  a data pin.
+- Do not power motors or a fan from a GPIO signal pin. The cooling fan is not
+  part of the sensor breadboard circuit.
+- A breadboard rail is not automatically powered, and some long rails are split
+  in the middle. Check continuity and the `+`/`-` markings.
+- Use the Pi's **physical pin numbers** in the table below. Count carefully from
+  the corner nearest the microSD end, or use `pinout` in the Pi terminal.
 
-### Why I2C for the OLED screen?
-I2C (Inter-Integrated Circuit) is a communication protocol that only needs
-2 wires (SDA and SCL) to send data between the Pi and the screen. The
-alternative, SPI, is faster but needs 4+ wires. For a small display that
-only updates every 2 seconds, I2C is simpler and more than fast enough.
+### Identify the resistor
 
----
+The DS18B20 needs a **4.7 kOhm pull-up resistor** between its data wire and
+3.3 V. A 4-band 4.7 kOhm resistor is usually **yellow, violet, red, gold**; a
+5-band one is usually **yellow, violet, black, brown, brown**. Color bands can
+be hard to read, so a multimeter is safer: disconnect the resistor from the
+circuit, select resistance/Ohms, and look for roughly `4.7 kOhm` or `4700 Ohm`.
+The exact reading may vary by its tolerance. Do not guess with an unknown part.
 
-### Why DS18B20 for temperature?
-The DS18B20 uses the 1-Wire protocol which means it only needs a single
-data wire plus power and ground. It is also waterproof and accurate to
-±0.5°C which is reliable enough for fridge monitoring. It communicates
-digitally so there is no analog to digital conversion needed unlike cheaper
-sensors like the DHT11.
+## Wiring (Pi powered off)
 
----
+First verify the labels or datasheet for the exact sensor module and OLED you
+own. Waterproof DS18B20 cable colors are common conventions, not guarantees.
 
-### Why SQLite for the database?
-SQLite is a file based database engine built directly into Python. There is
-no server to install or configure. The entire database lives in a single
-file called fridge.db sitting right next to the Python script. For a local
-project running on one device this is the perfect choice. A full database
-server like PostgreSQL or MySQL would be massive overkill here.
+| Part pin | Raspberry Pi signal | Physical pin |
+|---|---|---:|
+| DS18B20 VDD (often red) | 3.3 V | 1 |
+| DS18B20 DATA (often yellow/white) | GPIO4 | 7 |
+| DS18B20 GND (often black) | Ground | 6 |
+| OLED VCC | 3.3 V | 1 |
+| OLED GND | Ground | 6 |
+| OLED SDA | GPIO2 / SDA | 3 |
+| OLED SCL | GPIO3 / SCL | 5 |
 
----
+Place the 4.7 kOhm resistor between the DS18B20 DATA row and the 3.3 V row.
+Sharing 3.3 V and ground through correctly connected breadboard rails is fine.
 
-### Why threading?
-The main loop needs to update the OLED screen every 2 seconds without
-stopping. The barcode scanner needs to wait for input at any time without
-a timer. These two tasks cannot share one loop because input() blocks —
-meaning the program would freeze and wait for a barcode scan and the
-screen would stop updating. Threading solves this by running the scanner
-listener in the background simultaneously so both tasks work at the same
-time without blocking each other.
+### Cooling fan check
 
----
+A stopped fan does not necessarily mean the Pi failed to boot.
 
-### Why try/except on the sensor and screen imports?
-The sensor and screen are physical hardware that may not be plugged in
-during development. Without try/except the entire program would crash
-immediately if either piece of hardware was missing. Wrapping them in
-try/except lets the program boot in terminal only mode so you can write
-and test all the database and logic code before the hardware arrives.
+1. Shut down with `sudo shutdown -h now`, wait for activity to stop, and unplug
+   power before checking the fan connector.
+2. Identify the fan model and its labels. For a basic **2-wire 5 V fan**, red
+   normally goes to 5 V (physical pin 2 or 4) and black to ground (for example
+   physical pin 6). Do not rely on color alone.
+3. A temperature-controlled fan, official fan accessory, or 3/4-wire fan may
+   remain off while the CPU is cool and must use its specified connector or
+   configuration. Do not improvise its wiring.
+4. Check the CPU temperature with `vcgencmd measure_temp`. If the Pi overheats,
+   reports throttling, smells hot, or the fan is meant to be always-on but does
+   not spin, shut it down and recheck the fan documentation and connector.
 
----
+Never connect a 5 V fan to a 3.3 V GPIO signal pin. Do not move its connector
+while the Pi is powered.
 
-### Why Open Food Facts API?
-Manually typing product names every time you scan a barcode would make the
-scanner pointless. Open Food Facts is a free, open source food database
-with millions of products that requires no API key. Sending a barcode
-number returns the full product name automatically. The function falls back
-to the raw barcode number if there is no internet connection so the program
-never crashes due to a failed API call.
+## Put the code on the Pi
 
----
+Connect the Pi to the internet, open Terminal, and run:
 
-### Why log temperature to CSV and not the database?
-Temperature readings happen every 10 seconds and are purely historical
-data you might want to open in Excel or Google Sheets to visualize as a
-graph. CSV is the universal format for that. The SQLite database is for
-structured inventory data you need to query and update. Using the right
-tool for each type of data keeps both systems clean and simple.
+```bash
+sudo apt update
+sudo apt install -y git python3-venv i2c-tools
+cd ~
+git clone https://github.com/FarhnChy/bmo_fridge_buddy.git
+cd bmo_fridge_buddy
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-rpi.txt
+```
 
----
+If the repository is private, authenticate with GitHub or copy the project from
+your computer with SCP instead. Do not clone again over an existing folder.
 
-### Why check expiration dates every 30 seconds instead of every loop?
-The expiration check queries the database on every call. Running a database
-query every 2 seconds is unnecessary because expiration dates are measured
-in days not seconds. Checking every 30 seconds is frequent enough to catch
-warnings quickly while keeping database reads minimal.
+Enable the hardware interfaces:
+
+```bash
+sudo raspi-config
+```
+
+In **Interface Options**, enable I2C and 1-Wire, then reboot:
+
+```bash
+sudo reboot
+```
+
+After reconnecting, verify the devices:
+
+```bash
+i2cdetect -y 1
+ls /sys/bus/w1/devices/28-*/w1_slave
+```
+
+The OLED commonly appears as address `3c` or `3d`. A DS18B20 path starts with
+`28-`. If either is missing, power down and recheck wiring before continuing.
+
+Run the application:
+
+```bash
+cd ~/bmo_fridge_buddy
+source .venv/bin/activate
+python bmo_fridge.py
+```
+
+The program deliberately falls back to terminal output if the OLED or sensor is
+not ready. Type `help` for commands and `quit` to exit.
+
+## Update the code later
+
+Commit and push changes from your development computer. On the Pi, stop the
+program and run:
+
+```bash
+cd ~/bmo_fridge_buddy
+git status --short
+git pull --ff-only
+source .venv/bin/activate
+python -m pip install -r requirements-rpi.txt
+python -m py_compile bmo_fridge.py
+python bmo_fridge.py
+```
+
+If `git status` shows Pi-side edits, do not discard them blindly; commit/copy
+them or resolve the conflict first. `fridge.db` and `temperature_log.csv` are
+ignored by Git, so normal pulls do not replace the Pi's inventory or log.
+
+## Why these tools
+
+Python has mature Raspberry Pi hardware libraries and includes SQLite and
+threading. I2C uses only SDA and SCL for the display; the DS18B20 uses one data
+line. SQLite keeps inventory in one local file, while CSV makes temperature
+history easy to graph. The scanner thread can wait for keyboard-style barcode
+input without stopping display refreshes. Open Food Facts supplies product
+names, with a barcode fallback when the lookup is unavailable.
+
+Generated runtime files are `fridge.db` and `temperature_log.csv`; both are
+excluded from Git.

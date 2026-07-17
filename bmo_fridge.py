@@ -1,10 +1,4 @@
 """
-BMO Fridge Buddy
-================
-
-This file is the main program for the Raspberry Pi mini fridge screen buddy.
-It is intentionally written as one readable script while you are learning.
-
 What it does:
 - Reads fridge temperature from a DS18B20 sensor when running on a Raspberry Pi.
 - Shows a small BMO-style status screen on an SSD1306 I2C OLED when available.
@@ -13,13 +7,8 @@ What it does:
 - Lets a USB barcode scanner act like keyboard input.
 - Looks up product names with the Open Food Facts API.
 
-The script also runs on a normal computer without the Pi hardware. In that case
-it falls back to terminal output so you can practice the database, API, and
-program flow before wiring anything.
 """
-
 from __future__ import annotations
-
 import csv
 import json
 import sqlite3
@@ -32,10 +21,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-
 APP_NAME = "BMO Fridge"
 APP_VERSION = "0.1"
-
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "fridge.db"
 TEMP_LOG_PATH = BASE_DIR / "temperature_log.csv"
@@ -80,11 +67,9 @@ class AppState:
 class BmoDisplay:
     """
     Wrapper around the OLED screen.
-
     If the Pi display libraries are not installed, this class uses terminal
     output instead. That keeps development possible before hardware is ready.
     """
-
     def __init__(self) -> None:
         self.hardware_ready = False
         self.display = None
@@ -139,14 +124,11 @@ class BmoDisplay:
         self.draw.rectangle((8, 8, 30, 26), outline=255, fill=0)
         self.draw.rectangle((98, 8, 120, 26), outline=255, fill=0)
         self.draw.arc((44, 12, 84, 42), 20, 160, fill=255)
-
         self.draw.text((0, 36), f"Temp: {temp_text}", font=self.font, fill=255)
         self.draw.text((0, 46), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
         self.draw.text((0, 56), message, font=self.font, fill=255)
-
         self.display.image(self.image)
         self.display.show()
-
 
 def connect_db() -> sqlite3.Connection:
     """
@@ -182,7 +164,6 @@ def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
     """
     Insert a new item or add one to the quantity if the barcode already exists.
     """
-
     now = datetime.now().isoformat(timespec="seconds")
     with connect_db() as connection:
         existing = connection.execute(
@@ -213,7 +194,6 @@ def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
             (barcode, name, expires_on, now, now),
         )
         return f"Added {name}"
-
 
 def remove_one_item(barcode: str) -> str:
     with connect_db() as connection:
@@ -253,7 +233,6 @@ def list_inventory(limit: int = 10) -> list[sqlite3.Row]:
             (limit,),
         ).fetchall()
 
-
 def count_inventory() -> int:
     with connect_db() as connection:
         row = connection.execute("SELECT COALESCE(SUM(quantity), 0) AS total FROM inventory").fetchone()
@@ -274,7 +253,6 @@ def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:
             """,
             (cutoff.isoformat(),),
         ).fetchall()
-
 
 def fetch_product_name(barcode: str) -> str:
     """
@@ -316,7 +294,6 @@ def fetch_product_name(barcode: str) -> str:
         return str(product_name).strip()
     return f"Unknown item {barcode}"
 
-
 def parse_expiration_date(raw_value: str) -> str | None:
     raw_value = raw_value.strip()
     if not raw_value:
@@ -329,7 +306,6 @@ def parse_expiration_date(raw_value: str) -> str | None:
         return None
 
     return parsed.isoformat()
-
 
 def read_temperature_c() -> float | None:
     """
@@ -364,7 +340,6 @@ def read_temperature_c() -> float | None:
     milli_celsius = int(lines[1][temperature_index + len(marker) :])
     return milli_celsius / 1000.0
 
-
 def log_temperature(timestamp: datetime, temperature_c: float | None) -> None:
     file_exists = TEMP_LOG_PATH.exists()
     with TEMP_LOG_PATH.open("a", newline="", encoding="utf-8") as csv_file:
@@ -378,7 +353,6 @@ def log_temperature(timestamp: datetime, temperature_c: float | None) -> None:
             ]
         )
 
-
 def print_help() -> None:
     print()
     print("Commands:")
@@ -390,14 +364,12 @@ def print_help() -> None:
     print("  quit                stop the program")
     print()
 
-
 def handle_barcode_scan(barcode: str, state: AppState) -> None:
     product_name = fetch_product_name(barcode)
     expires_on = parse_expiration_date(input("Expiration date YYYY-MM-DD, or blank: "))
     message = add_or_update_item(barcode, product_name, expires_on)
     print(message)
     state.set_message(message)
-
 
 def scanner_listener(state: AppState) -> None:
     """
@@ -406,7 +378,6 @@ def scanner_listener(state: AppState) -> None:
     Most USB barcode scanners act like keyboards: they type the barcode and
     press Enter. That means input() is enough for a first version.
     """
-
     print_help()
     while True:
         try:
@@ -454,7 +425,6 @@ def scanner_listener(state: AppState) -> None:
 
         handle_barcode_scan(raw_command, state)
 
-
 def update_counts(state: AppState) -> None:
     expiring_items = get_expiring_items()
     with state.lock:
@@ -464,7 +434,6 @@ def update_counts(state: AppState) -> None:
     if expiring_items:
         first = expiring_items[0]
         state.set_message(f"Soon: {first['name']}")
-
 
 def main() -> None:
     init_db()
@@ -506,7 +475,6 @@ def main() -> None:
         state.set_message("BMO shutting down")
     finally:
         print(f"{APP_NAME} stopped.")
-
-
+ 
 if __name__ == "__main__":
     main()

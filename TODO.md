@@ -1,125 +1,48 @@
-# BMO Fridge Project TODO
+# BMO Fridge Buddy TODO
 
-Due today: 2026-06-15
+## Do next: safe Pi bring-up
 
-## 1. Create and Connect the GitHub Repo
+- [ ] Read the exact Raspberry Pi model printed on the board.
+- [ ] Identify the fan model/type and its voltage before reconnecting it.
+- [ ] With power unplugged, inspect the fan plug and GPIO wiring.
+- [ ] Confirm the Pi boots; run `vcgencmd measure_temp` and note the result.
+- [ ] Identify a 4.7 kOhm resistor with a multimeter (preferred) or color bands.
+- [ ] Confirm the DS18B20 lead/pin order from its label or seller datasheet.
+- [ ] Wire only the DS18B20 and its 4.7 kOhm pull-up first.
+- [ ] Boot and confirm `/sys/bus/w1/devices/28-*/w1_slave` exists.
+- [ ] Power down, add the OLED, boot, and locate it with `i2cdetect -y 1`.
 
-- [ ] Create a new empty GitHub repository for this project.
-- [ ] Copy the repo URL.
-- [ ] Initialize Git locally:
+## Put software on the Pi
 
-```bash
-git init
-git branch -M main
-```
+- [ ] Install Git, `python3-venv`, and `i2c-tools`.
+- [ ] Clone `https://github.com/FarhnChy/bmo_fridge_buddy.git`.
+- [ ] Create `.venv` and install `requirements-rpi.txt` as shown in README.
+- [ ] Enable I2C and 1-Wire in `sudo raspi-config`, then reboot.
+- [ ] Run `python -m py_compile bmo_fridge.py` inside the virtual environment.
+- [ ] Run `python bmo_fridge.py` and note any `[display]` or `[sensor]` message.
 
-- [ ] Confirm generated local files are ignored:
+## Functional test
 
-```bash
-git status --short
-```
+- [ ] OLED shows the BMO face, temperature, item count, soon count, and status.
+- [ ] Temperature changes and is appended to `temperature_log.csv`.
+- [ ] Test `help`, `list`, `expiring`, `remove <barcode>`, and `quit`.
+- [ ] Confirm the USB barcode scanner types a barcode followed by Enter.
+- [ ] Scan an item, enter an expiration date, and confirm it persists in SQLite.
+- [ ] Confirm `fridge.db` and `temperature_log.csv` remain ignored by Git.
 
-Expected: `fridge.db`, `temperature_log.csv`, and `__pycache__/` should not appear.
+## Deployment and updates
 
-- [ ] Make the first commit:
+- [ ] Decide whether manual startup is enough for the first demo.
+- [ ] After manual testing is stable, add a systemd service for startup on boot.
+- [ ] Test the documented `git pull --ff-only` update workflow on the Pi.
+- [ ] Back up `fridge.db` before any database/schema migration.
 
-```bash
-git add .gitignore README.md CODEX.md bmo_fridge.py requirements-rpi.txt TODO.md
-git commit -m "Create BMO fridge monitor project"
-```
+## Project cleanup and proof
 
-- [ ] Connect the local repo to GitHub:
-
-```bash
-git remote add origin <your-github-repo-url>
-git push -u origin main
-```
-
-## 2. Update Project Identity
-
-- [ ] Replace the placeholder Open Food Facts user agent contact text in `bmo_fridge.py` after the GitHub repo exists.
-- [ ] Add the actual GitHub repo URL to `README.md`.
-- [ ] Fix broken special characters in `README.md` and `CODEX.md` if punctuation or degree symbols display incorrectly.
-
-## 3. Local Software Check
-
-- [ ] Run the syntax check:
-
-```bash
-python -m py_compile bmo_fridge.py
-```
-
-- [ ] Run the app locally:
-
-```bash
-python bmo_fridge.py
-```
-
-- [ ] Test these commands in terminal mode:
-  - [ ] `help`
-  - [ ] `list`
-  - [ ] scan/type a barcode
-  - [ ] enter an expiration date as `YYYY-MM-DD`
-  - [ ] `expiring`
-  - [ ] `remove <barcode>`
-  - [ ] `quit`
-
-- [ ] Confirm `fridge.db` and `temperature_log.csv` are created locally but still ignored by Git.
-
-## 4. Raspberry Pi Setup
-
-- [ ] Copy or clone the repo onto the Raspberry Pi.
-- [ ] Install dependencies on the Pi:
-
-```bash
-python -m pip install -r requirements-rpi.txt
-```
-
-- [ ] Enable I2C for the SSD1306 OLED display.
-- [ ] Enable 1-Wire for the DS18B20 temperature sensor.
-- [ ] Reboot the Pi after enabling hardware interfaces.
-- [ ] Confirm the DS18B20 appears under `/sys/bus/w1/devices/28-*/w1_slave`.
-- [ ] Run the app on the Pi and confirm it does not fall back to terminal-only display mode.
-
-## 5. Hardware Verification
-
-- [ ] Confirm the OLED shows:
-  - [ ] BMO face
-  - [ ] temperature
-  - [ ] item count
-  - [ ] expiring-soon count
-  - [ ] status message
-
-- [ ] Confirm the temperature reading changes and logs to `temperature_log.csv`.
-- [ ] Confirm the USB barcode scanner types a barcode and presses Enter automatically.
-- [ ] Confirm a scanned item is saved to SQLite.
-- [ ] Confirm removing an item updates the quantity or deletes the row.
-
-## 6. Final Proof for Submission
-
-- [ ] Take a photo or short video of the wired hardware running.
-- [ ] Take a screenshot of the GitHub repo with the committed files.
-- [ ] Take a screenshot or terminal output showing the app running.
-- [ ] Make one final commit if README or code changed:
-
-```bash
-git add README.md CODEX.md bmo_fridge.py TODO.md
-git commit -m "Document setup and finish project checklist"
-git push
-```
-
-## Must Be Done Today
-
-- [ ] GitHub repo created.
-- [ ] Local project committed and pushed.
-- [ ] Placeholder repo/contact text updated.
-- [ ] Local terminal test completed.
-- [ ] README cleaned up enough for someone else to run the project.
-
-## Can Move Past Today If Hardware Is Not Ready
-
-- [ ] Raspberry Pi dependency install.
-- [ ] OLED display test.
-- [ ] DS18B20 sensor test.
-- [ ] Barcode scanner test on the Pi.
-- [ ] Final hardware demo photo/video.
+- [x] Git remote points to the project repository.
+- [x] Open Food Facts User-Agent contains the repository URL.
+- [x] README contains wiring, fan safety, installation, and update instructions.
+- [ ] Review and commit the current `bmo_fridge.py`, README, and TODO changes.
+- [ ] Push the final commit to GitHub before cloning/pulling it on the Pi.
+- [ ] Capture a photo/video of the powered, working hardware.
+- [ ] Capture terminal output showing the sensor, OLED, and app checks.
