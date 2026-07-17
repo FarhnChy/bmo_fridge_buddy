@@ -1,3 +1,4 @@
+# Raspberry Pi OLED display dependencies
 adafruit-blinka
 adafruit-circuitpython-ssd1306
 pillow
