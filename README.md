@@ -45,25 +45,6 @@ own. Waterproof DS18B20 cable colors are common conventions, not guarantees.
 Place the 4.7 kOhm resistor between the DS18B20 DATA row and the 3.3 V row.
 Sharing 3.3 V and ground through correctly connected breadboard rails is fine.
 
-### Cooling fan check
-
-A stopped fan does not necessarily mean the Pi failed to boot.
-
-1. Shut down with `sudo shutdown -h now`, wait for activity to stop, and unplug
-   power before checking the fan connector.
-2. Identify the fan model and its labels. For a basic **2-wire 5 V fan**, red
-   normally goes to 5 V (physical pin 2 or 4) and black to ground (for example
-   physical pin 6). Do not rely on color alone.
-3. A temperature-controlled fan, official fan accessory, or 3/4-wire fan may
-   remain off while the CPU is cool and must use its specified connector or
-   configuration. Do not improvise its wiring.
-4. Check the CPU temperature with `vcgencmd measure_temp`. If the Pi overheats,
-   reports throttling, smells hot, or the fan is meant to be always-on but does
-   not spin, shut it down and recheck the fan documentation and connector.
-
-Never connect a 5 V fan to a 3.3 V GPIO signal pin. Do not move its connector
-while the Pi is powered.
-
 ## Put the code on the Pi
 
 Connect the Pi to the internet, open Terminal, and run:
