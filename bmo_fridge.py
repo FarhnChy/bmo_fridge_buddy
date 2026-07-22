@@ -5,6 +5,7 @@ What it does:
 - Stores scanned food inventory in SQLite.
 - Logs temperature history to CSV.
 - Lets a USB barcode scanner act like keyboard input.
+- Lets a phone add or scan barcodes through a local web page.
 - Looks up product names with the Open Food Facts API.
 """
 
@@ -13,7 +14,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 import csv
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import socket
 import sqlite3
 import threading
 import time
@@ -38,10 +42,259 @@ EXPIRATION_CHECK_SECONDS = 30
 EXPIRING_SOON_DAYS = 3
 FRIDGE_MIN_F = 32.0
 FRIDGE_MAX_F = 40.0
+PHONE_SCANNER_HOST = "0.0.0.0"
+PHONE_SCANNER_PORT = 8080
 
 # Open Food Facts asks API users to send a custom User-Agent with contact info.
 OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/FarhnChy/bmo_fridge_buddy)"
 OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
+
+PHONE_SCANNER_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BMO Fridge Scanner</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #102521;
+      color: #f7fffb;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #0d2a26, #12201e);
+    }
+
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      font-weight: 750;
+    }
+
+    .status {
+      min-height: 24px;
+      margin: 0 0 16px;
+      color: #b7d8d1;
+      font-size: 15px;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border: 1px solid #315b54;
+      border-radius: 8px;
+      background: #07120f;
+      object-fit: cover;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 6px;
+      color: #d8eee9;
+      font-weight: 650;
+    }
+
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid #47736b;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: #f7fffb;
+      color: #0b1715;
+      font-size: 18px;
+    }
+
+    button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: #78e0c2;
+      color: #081412;
+      font-size: 16px;
+      font-weight: 750;
+    }
+
+    button.secondary {
+      background: #d5e7e3;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .message {
+      min-height: 24px;
+      margin-top: 16px;
+      color: #c9fff0;
+      font-weight: 650;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BMO Fridge</h1>
+    <p id="status" class="status">Loading...</p>
+
+    <video id="preview" muted playsinline></video>
+
+    <form id="scan-form">
+      <label for="barcode">Barcode</label>
+      <input id="barcode" name="barcode" inputmode="numeric" autocomplete="off" required>
+
+      <label for="expires">Expiration date</label>
+      <input id="expires" name="expires" type="date">
+
+      <div class="buttons">
+        <button id="camera-button" type="button">Scan</button>
+        <button class="secondary" type="submit">Add</button>
+      </div>
+    </form>
+
+    <p id="message" class="message"></p>
+  </main>
+
+  <script>
+    const video = document.getElementById("preview");
+    const form = document.getElementById("scan-form");
+    const barcodeInput = document.getElementById("barcode");
+    const expiresInput = document.getElementById("expires");
+    const statusText = document.getElementById("status");
+    const messageText = document.getElementById("message");
+    const cameraButton = document.getElementById("camera-button");
+    let stream = null;
+    let scanning = false;
+
+    async function refreshStatus() {
+      try {
+        const response = await fetch("/api/status");
+        const status = await response.json();
+        const temp = status.temperature_f === null ? "--.- F" : `${status.temperature_f.toFixed(1)} F`;
+        statusText.textContent = `${temp} | ${status.temperature_status} | ${status.inventory_count} items`;
+      } catch {
+        statusText.textContent = "BMO status unavailable";
+      }
+    }
+
+    function stopCamera() {
+      scanning = false;
+      if (stream) {
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+      }
+      stream = null;
+      cameraButton.textContent = "Scan";
+    }
+
+    async function startCamera() {
+      if (!("BarcodeDetector" in window)) {
+        messageText.textContent = "This browser cannot scan here. Type the barcode instead.";
+        return;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        video.srcObject = stream;
+        await video.play();
+      } catch {
+        messageText.textContent = "Camera did not open. Type the barcode instead.";
+        return;
+      }
+
+      let detector;
+      try {
+        detector = new BarcodeDetector({
+          formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"]
+        });
+      } catch {
+        messageText.textContent = "This browser cannot scan here. Type the barcode instead.";
+        stopCamera();
+        return;
+      }
+
+      scanning = true;
+      cameraButton.textContent = "Stop";
+      messageText.textContent = "Point the camera at the barcode.";
+
+      while (scanning) {
+        try {
+          const codes = await detector.detect(video);
+          if (codes.length > 0) {
+            barcodeInput.value = codes[0].rawValue;
+            messageText.textContent = `Found ${codes[0].rawValue}`;
+            stopCamera();
+            break;
+          }
+        } catch {
+          messageText.textContent = "Scanning stopped. Type the barcode instead.";
+          stopCamera();
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+
+    cameraButton.addEventListener("click", () => {
+      if (scanning) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      stopCamera();
+      messageText.textContent = "Adding item...";
+
+      try {
+        const response = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barcode: barcodeInput.value,
+            expires_on: expiresInput.value
+          })
+        });
+        const result = await response.json();
+        messageText.textContent = result.message;
+        if (result.ok) {
+          barcodeInput.value = "";
+          expiresInput.value = "";
+          barcodeInput.focus();
+          refreshStatus();
+        }
+      } catch {
+        messageText.textContent = "Could not reach BMO.";
+      }
+    });
+
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
+  </script>
+</body>
+</html>
+"""
 
 
 def celsius_to_fahrenheit(temperature_c: float) -> float:
@@ -401,6 +654,119 @@ def log_temperature(timestamp: datetime, temperature_c: float | None) -> None:
         )
 
 
+def add_scanned_item(barcode: str, expires_on: str | None, state: AppState) -> str:
+    product_name = fetch_product_name(barcode)
+    message = add_or_update_item(barcode, product_name, expires_on)
+    print(message)
+    state.set_message(message)
+    update_counts(state)
+    return message
+
+
+def make_phone_scanner_handler(state: AppState) -> type[BaseHTTPRequestHandler]:
+    class PhoneScannerHandler(BaseHTTPRequestHandler):
+        server_version = "BMOFridgeHTTP/0.1"
+
+        def do_GET(self) -> None:
+            if self.path in {"/", "/index.html"}:
+                self.send_text(PHONE_SCANNER_PAGE, "text/html; charset=utf-8")
+                return
+
+            if self.path == "/api/status":
+                snapshot = state.snapshot()
+                raw_temperature_c = snapshot["last_temperature_c"]
+                temperature_c = None if raw_temperature_c is None else float(raw_temperature_c)
+                temperature_f = None if temperature_c is None else celsius_to_fahrenheit(temperature_c)
+                self.send_json(
+                    {
+                        "ok": True,
+                        "message": snapshot["last_message"],
+                        "temperature_f": temperature_f,
+                        "temperature_status": classify_temperature_status(temperature_c),
+                        "inventory_count": snapshot["inventory_count"],
+                        "expiring_count": snapshot["expiring_count"],
+                    }
+                )
+                return
+
+            self.send_json({"ok": False, "message": "Not found"}, HTTPStatus.NOT_FOUND)
+
+        def do_POST(self) -> None:
+            if self.path != "/api/scan":
+                self.send_json({"ok": False, "message": "Not found"}, HTTPStatus.NOT_FOUND)
+                return
+
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            except (ValueError, json.JSONDecodeError):
+                self.send_json({"ok": False, "message": "Bad request"}, HTTPStatus.BAD_REQUEST)
+                return
+
+            barcode = str(payload.get("barcode") or "").strip()
+            raw_expiration = str(payload.get("expires_on") or "").strip()
+
+            if not barcode:
+                self.send_json({"ok": False, "message": "Enter a barcode"}, HTTPStatus.BAD_REQUEST)
+                return
+
+            expires_on = parse_expiration_date(raw_expiration)
+            if raw_expiration and expires_on is None:
+                self.send_json({"ok": False, "message": "Use expiration format YYYY-MM-DD"}, HTTPStatus.BAD_REQUEST)
+                return
+
+            message = add_scanned_item(barcode, expires_on, state)
+            self.send_json({"ok": True, "message": message})
+
+        def send_text(self, body: str, content_type: str, status: HTTPStatus = HTTPStatus.OK) -> None:
+            encoded_body = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(encoded_body)))
+            self.end_headers()
+            self.wfile.write(encoded_body)
+
+        def send_json(self, body: dict[str, object], status: HTTPStatus = HTTPStatus.OK) -> None:
+            encoded_body = json.dumps(body).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded_body)))
+            self.end_headers()
+            self.wfile.write(encoded_body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            print(f"[phone] {self.address_string()} - {format % args}")
+
+    return PhoneScannerHandler
+
+
+def get_local_ip_address() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("8.8.8.8", 80))
+            return str(probe.getsockname()[0])
+    except OSError:
+        return socket.gethostbyname(socket.gethostname())
+
+
+def start_phone_scanner_server(state: AppState) -> ThreadingHTTPServer | None:
+    try:
+        server = ThreadingHTTPServer(
+            (PHONE_SCANNER_HOST, PHONE_SCANNER_PORT),
+            make_phone_scanner_handler(state),
+        )
+    except OSError as exc:
+        print(f"[phone] Web scanner unavailable: {exc}")
+        return None
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    local_ip = get_local_ip_address()
+    print(f"[phone] Open http://{local_ip}:{PHONE_SCANNER_PORT} on your phone")
+    print(f"[phone] Or try http://raspberrypi.local:{PHONE_SCANNER_PORT}")
+    return server
+
+
 def print_help() -> None:
     print()
     print("Commands:")
@@ -411,11 +777,11 @@ def print_help() -> None:
     print("  help                show this help")
     print("  quit                stop the program")
     print()
+    print(f"Phone scanner: open http://<pi-ip-address>:{PHONE_SCANNER_PORT}")
+    print()
 
 
 def handle_barcode_scan(barcode: str, state: AppState) -> None:
-    product_name = fetch_product_name(barcode)
-
     while True:
         try:
             raw_expiration = input("Expiration date YYYY-MM-DD, or blank: ")
@@ -429,9 +795,7 @@ def handle_barcode_scan(barcode: str, state: AppState) -> None:
         if not raw_expiration.strip() or expires_on is not None:
             break
 
-    message = add_or_update_item(barcode, product_name, expires_on)
-    print(message)
-    state.set_message(message)
+    add_scanned_item(barcode, expires_on, state)
 
 
 def scanner_listener(state: AppState) -> None:
@@ -509,6 +873,7 @@ def main() -> None:
     init_db()
     state = AppState()
     display = BmoDisplay()
+    phone_server = start_phone_scanner_server(state)
 
     listener = threading.Thread(
         target=scanner_listener,
@@ -544,6 +909,9 @@ def main() -> None:
     except KeyboardInterrupt:
         state.set_message("BMO shutting down")
     finally:
+        if phone_server is not None:
+            phone_server.shutdown()
+            phone_server.server_close()
         print(f"{APP_NAME} stopped.")
 
 
