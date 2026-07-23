@@ -27,6 +27,14 @@ class WebAppTest(unittest.TestCase):
         self.assertIn(b"Scan a barcode", response.data)
         self.assertIn(b"Expiring soon", response.data)
         self.assertIn(b'data-filter="expired"', response.data)
+        self.assertIn(b"vendor/zxing-browser.min.js", response.data)
+        self.assertNotIn(b"unpkg.com", response.data)
+
+    def test_vendored_barcode_reader_is_served(self):
+        response = self.client.get("/static/vendor/zxing-browser.min.js")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"BrowserMultiFormatReader", response.data)
+        response.close()
 
     @patch.object(bmo_fridge, "fetch_product_details")
     def test_lookup_returns_product(self, lookup):

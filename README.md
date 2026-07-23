@@ -42,9 +42,12 @@ python web_app.py
 
 The terminal prints an address such as `http://192.168.1.25:5000`. Open that
 address from a phone on the same private Wi-Fi. Manual barcode entry and the
-**Take photo** option work from this local page. Continuous **Live scan** camera
-access requires a trusted HTTPS certificate because mobile browsers block live
-camera streams on insecure pages.
+**Take photo** option work from this local page. The ZXing barcode reader is
+stored in this repository, so the scanner itself loads without internet
+access. Product-name lookup still needs internet and falls back to an editable
+`Unknown item` name when offline. Continuous **Live scan** camera access
+requires a trusted HTTPS certificate because mobile browsers block live camera
+streams on insecure pages.
 
 For HTTPS, set paths to a trusted certificate and matching private key before
 starting the server:
