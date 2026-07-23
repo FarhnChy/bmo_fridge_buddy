@@ -2,3 +2,6 @@
 adafruit-blinka
 adafruit-circuitpython-ssd1306
 pillow
+
+# Phone-friendly inventory and barcode scanner web app
+flask

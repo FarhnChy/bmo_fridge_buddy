@@ -1,0 +1,8 @@
+{
+  "name": "BMO Fridge Buddy",
+  "short_name": "BMO Fridge",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f0df",
+  "theme_color": "#62b9aa"
+}

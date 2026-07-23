@@ -47,7 +47,11 @@ PHONE_SCANNER_PORT = 8080
 
 # Open Food Facts asks API users to send a custom User-Agent with contact info.
 OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/FarhnChy/bmo_fridge_buddy)"
-OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
+OPEN_FOOD_FACTS_URL = (
+    "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
+    "?fields=code,product_name,product_name_en,generic_name,"
+    "abbreviated_product_name,brands,image_front_small_url"
+)
 
 PHONE_SCANNER_PAGE = """<!doctype html>
 <html lang="en">
@@ -337,6 +341,7 @@ class BmoDisplay:
 
     def __init__(self) -> None:
         self.hardware_ready = False
+        self.last_terminal_status: str | None = None
         self.display = None
         self.image = None
         self.draw = None
@@ -373,10 +378,13 @@ class BmoDisplay:
         expiring_count = state["expiring_count"]
 
         if not self.hardware_ready:
-            print(
+            terminal_status = (
                 f"[BMO] temp={temp_text} items={inventory_count} "
                 f"expiring={expiring_count} status={temp_status} msg={message}"
             )
+            if terminal_status != self.last_terminal_status:
+                print(terminal_status)
+                self.last_terminal_status = terminal_status
             return
 
         assert self.display is not None
@@ -422,11 +430,20 @@ def connect_db() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     with connect_db() as connection:
+        existing_table = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'inventory'"
+        ).fetchone()
+
+        # Version 0.1 allowed only one row per barcode. Migrate it in place so
+        # different cartons of the same product can keep different dates.
+        if existing_table and "barcode TEXT NOT NULL UNIQUE" in existing_table["sql"]:
+            connection.execute("ALTER TABLE inventory RENAME TO inventory_legacy")
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                barcode TEXT NOT NULL UNIQUE,
+                barcode TEXT NOT NULL,
                 name TEXT NOT NULL,
                 quantity INTEGER NOT NULL DEFAULT 1,
                 expires_on TEXT,
@@ -435,9 +452,31 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS inventory_barcode_expiration
+            ON inventory (barcode, COALESCE(expires_on, ''))
+            """
+        )
+
+        if existing_table and "barcode TEXT NOT NULL UNIQUE" in existing_table["sql"]:
+            connection.execute(
+                """
+                INSERT INTO inventory
+                    (barcode, name, quantity, expires_on, created_at, updated_at)
+                SELECT barcode, name, quantity, expires_on, created_at, updated_at
+                FROM inventory_legacy
+                """
+            )
+            connection.execute("DROP TABLE inventory_legacy")
 
 
-def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
+def add_or_update_item(
+    barcode: str,
+    name: str,
+    expires_on: str | None,
+    quantity: int = 1,
+) -> str:
     """
     Insert a new item or add one to the quantity if the barcode already exists.
     """
@@ -445,39 +484,43 @@ def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
     now = datetime.now().isoformat(timespec="seconds")
     with connect_db() as connection:
         existing = connection.execute(
-            "SELECT quantity FROM inventory WHERE barcode = ?",
-            (barcode,),
+            "SELECT quantity FROM inventory WHERE barcode = ? AND expires_on IS ?",
+            (barcode, expires_on),
         ).fetchone()
 
         if existing:
             connection.execute(
                 """
                 UPDATE inventory
-                SET quantity = quantity + 1,
+                SET quantity = quantity + ?,
                     name = ?,
-                    expires_on = COALESCE(?, expires_on),
                     updated_at = ?
-                WHERE barcode = ?
+                WHERE barcode = ? AND expires_on IS ?
                 """,
-                (name, expires_on, now, barcode),
+                (quantity, name, now, barcode, expires_on),
             )
-            quantity = int(existing["quantity"]) + 1
-            return f"Added one more {name} (qty {quantity})"
+            new_quantity = int(existing["quantity"]) + quantity
+            return f"Added {quantity} {name} (qty {new_quantity})"
 
         connection.execute(
             """
             INSERT INTO inventory (barcode, name, quantity, expires_on, created_at, updated_at)
-            VALUES (?, ?, 1, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (barcode, name, expires_on, now, now),
+            (barcode, name, quantity, expires_on, now, now),
         )
-        return f"Added {name}"
+        return f"Added {quantity} {name}"
 
 
 def remove_one_item(barcode: str) -> str:
     with connect_db() as connection:
         item = connection.execute(
-            "SELECT name, quantity FROM inventory WHERE barcode = ?",
+            """
+            SELECT id, name, quantity FROM inventory
+            WHERE barcode = ?
+            ORDER BY expires_on IS NULL, expires_on, id
+            LIMIT 1
+            """,
             (barcode,),
         ).fetchone()
 
@@ -490,13 +533,39 @@ def remove_one_item(barcode: str) -> str:
                 UPDATE inventory
                 SET quantity = quantity - 1,
                     updated_at = ?
-                WHERE barcode = ?
+                WHERE id = ?
                 """,
-                (datetime.now().isoformat(timespec="seconds"), barcode),
+                (datetime.now().isoformat(timespec="seconds"), item["id"]),
             )
             return f"Removed one {item['name']}"
 
-        connection.execute("DELETE FROM inventory WHERE barcode = ?", (barcode,))
+        connection.execute("DELETE FROM inventory WHERE id = ?", (item["id"],))
+        return f"Removed {item['name']}"
+
+
+def remove_item_by_id(item_id: int, remove_all: bool = False) -> str | None:
+    """Remove one unit (or a whole dated batch) for the web interface."""
+
+    with connect_db() as connection:
+        item = connection.execute(
+            "SELECT id, name, quantity FROM inventory WHERE id = ?",
+            (item_id,),
+        ).fetchone()
+        if item is None:
+            return None
+
+        if int(item["quantity"]) > 1 and not remove_all:
+            connection.execute(
+                """
+                UPDATE inventory
+                SET quantity = quantity - 1, updated_at = ?
+                WHERE id = ?
+                """,
+                (datetime.now().isoformat(timespec="seconds"), item_id),
+            )
+            return f"Removed one {item['name']}"
+
+        connection.execute("DELETE FROM inventory WHERE id = ?", (item_id,))
         return f"Removed {item['name']}"
 
 
@@ -504,7 +573,7 @@ def list_inventory(limit: int = 10) -> list[sqlite3.Row]:
     with connect_db() as connection:
         return connection.execute(
             """
-            SELECT barcode, name, quantity, expires_on
+            SELECT id, barcode, name, quantity, expires_on
             FROM inventory
             ORDER BY expires_on IS NULL, expires_on, name
             LIMIT ?
@@ -537,7 +606,7 @@ def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:
     with connect_db() as connection:
         return connection.execute(
             """
-            SELECT barcode, name, quantity, expires_on
+            SELECT id, barcode, name, quantity, expires_on
             FROM inventory
             WHERE expires_on IS NOT NULL
               AND date(expires_on) <= date(?)
@@ -547,7 +616,7 @@ def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def fetch_product_name(barcode: str) -> str:
+def fetch_product_details(barcode: str) -> dict[str, object]:
     """
     Ask Open Food Facts for a product name.
 
@@ -570,7 +639,7 @@ def fetch_product_name(barcode: str) -> str:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         print(f"[api] Open Food Facts lookup failed: {exc}")
-        return f"Unknown item {barcode}"
+        return {"found": False, "name": f"Unknown item {barcode}", "image_url": None}
 
     product = payload.get("product") or {}
     product_name = (
@@ -582,10 +651,21 @@ def fetch_product_name(barcode: str) -> str:
     brands = product.get("brands")
 
     if product_name and brands:
-        return f"{brands} {product_name}".strip()
-    if product_name:
-        return str(product_name).strip()
-    return f"Unknown item {barcode}"
+        name = f"{brands} {product_name}".strip()
+    elif product_name:
+        name = str(product_name).strip()
+    else:
+        name = f"Unknown item {barcode}"
+
+    return {
+        "found": bool(product_name),
+        "name": name,
+        "image_url": product.get("image_front_small_url"),
+    }
+
+
+def fetch_product_name(barcode: str) -> str:
+    return str(fetch_product_details(barcode)["name"])
 
 
 def parse_expiration_date(raw_value: str) -> str | None:
@@ -777,8 +857,6 @@ def print_help() -> None:
     print("  help                show this help")
     print("  quit                stop the program")
     print()
-    print(f"Phone scanner: open http://<pi-ip-address>:{PHONE_SCANNER_PORT}")
-    print()
 
 
 def handle_barcode_scan(barcode: str, state: AppState) -> None:
@@ -873,8 +951,6 @@ def main() -> None:
     init_db()
     state = AppState()
     display = BmoDisplay()
-    phone_server = start_phone_scanner_server(state)
-
     listener = threading.Thread(
         target=scanner_listener,
         args=(state,),
@@ -909,9 +985,6 @@ def main() -> None:
     except KeyboardInterrupt:
         state.set_message("BMO shutting down")
     finally:
-        if phone_server is not None:
-            phone_server.shutdown()
-            phone_server.server_close()
         print(f"{APP_NAME} stopped.")
 
 

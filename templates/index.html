@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#62b9aa">
+    <title>BMO Fridge Buddy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div class="face" aria-hidden="true"><i></i><i></i><span></span></div>
+        <div>
+          <p class="eyebrow">BMO Fridge Buddy</p>
+          <h1>What’s in the fridge?</h1>
+          <p id="status-line">Loading fridge status…</p>
+        </div>
+      </header>
+
+      <section class="panel scan-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Add food</p><h2>Scan a barcode</h2></div>
+          <div class="scan-actions">
+            <button id="start-scan" class="primary">Live scan</button>
+            <label class="secondary file-button">Take photo<input id="barcode-photo" type="file" accept="image/*" capture="environment"></label>
+          </div>
+        </div>
+        <div id="camera-wrap" class="camera-wrap" hidden>
+          <video id="camera" playsinline muted></video>
+          <div class="scan-guide"></div>
+          <button id="stop-scan" class="secondary">Close camera</button>
+        </div>
+        <p id="camera-note" class="note">Live scanning requires permission and HTTPS. Taking a barcode photo or typing its digits also works.</p>
+        <form id="item-form">
+          <label>Barcode<input id="barcode" name="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or type the digits" required></label>
+          <button id="lookup" type="button" class="secondary">Look up product</button>
+          <div id="product-preview" class="product-preview" hidden>
+            <img id="product-image" alt="" hidden>
+            <div><span>Product found</span><strong id="product-result"></strong></div>
+          </div>
+          <label>Item name<input id="name" name="name" maxlength="160" placeholder="Filled automatically, or type a name" required></label>
+          <div class="form-row">
+            <label>Expiration date<input id="expires-on" name="expires_on" type="date"></label>
+            <label>Quantity<input id="quantity" name="quantity" type="number" min="1" max="99" value="1" required></label>
+          </div>
+          <button type="submit" class="primary wide">Add to fridge</button>
+        </form>
+        <p id="form-message" class="message" role="status"></p>
+      </section>
+
+      <section class="panel inventory-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Inventory</p><h2>Your food</h2></div>
+          <button id="refresh" class="secondary">Refresh</button>
+        </div>
+        <div id="inventory" class="inventory-list"></div>
+      </section>
+    </main>
+
+    <template id="item-template">
+      <article class="item-card">
+        <div class="item-main"><strong></strong><span class="item-meta"></span><small></small></div>
+        <div class="item-actions"><span class="quantity"></span><button class="remove-one" aria-label="Remove one item">−1</button><button class="remove-all">Remove</button></div>
+      </article>
+    </template>
+
+    <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

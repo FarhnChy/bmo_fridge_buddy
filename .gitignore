@@ -5,6 +5,7 @@ __pycache__/
 # Local generated project data
 fridge.db
 temperature_log.csv
+tests/.test_inventory.db
 
 # Local environments and editor files
 .venv/
