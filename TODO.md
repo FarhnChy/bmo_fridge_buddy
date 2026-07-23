@@ -337,6 +337,20 @@ HTTPS setup are implemented but still need device-side installation and
 testing. Tailscale provides private-device access in place of a separate BMO
 login. Temperature graphs and alerts remain future improvements.
 
+### Parked roadmap: only after the hardware prototype works
+
+Do not let these ideas delay the original BMO hardware goal. First prove the
+real DS18B20, OLED face, temperature status, logging, and inventory workflow.
+After that Version 1 checkpoint, possible Version 2 work includes:
+
+- Show a larger animated BMO face and personality in the phone app.
+- Add fridge temperature history graphs similar to a thermostat or AC app.
+- Add sustained warm-temperature, disconnected-sensor, and expiration alerts.
+- Finish the installable phone PWA experience with icons and offline guidance.
+- Add a backup restore workflow and a hardware/service health page.
+
+The next active milestone remains hardware verification, not these features.
+
 ## Publish changes to GitHub
 
 On the Windows development computer:
