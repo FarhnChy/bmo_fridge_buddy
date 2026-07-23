@@ -25,6 +25,8 @@ class WebAppTest(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Scan a barcode", response.data)
+        self.assertIn(b"Expiring soon", response.data)
+        self.assertIn(b'data-filter="expired"', response.data)
 
     @patch.object(bmo_fridge, "fetch_product_details")
     def test_lookup_returns_product(self, lookup):

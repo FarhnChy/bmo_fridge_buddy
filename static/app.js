@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { scanner: null, scanLocked: false, product: null };
+const state = { scanner: null, scanLocked: false, product: null, inventory: [], filter: "all" };
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -101,27 +101,84 @@ async function scanPhoto(event) {
 async function loadInventory() {
   const container = $("#inventory");
   try {
-    const items = await api("/api/inventory");
-    container.replaceChildren();
-    if (!items.length) {
-      container.innerHTML = '<div class="empty"><strong>Your fridge log is empty.</strong><span>Scan your first item above.</span></div>';
-      return;
-    }
-    const template = $("#item-template");
-    for (const item of items) {
-      const card = template.content.firstElementChild.cloneNode(true);
-      card.querySelector("strong").textContent = item.name;
-      card.querySelector(".item-meta").textContent = item.expires_on ? `Expires ${formatDate(item.expires_on)}` : "No expiration date";
-      card.querySelector("small").textContent = `Barcode ${item.barcode}`;
-      card.querySelector(".quantity").textContent = `×${item.quantity}`;
-      card.querySelector(".edit-item").addEventListener("click", () => openEditor(item));
-      card.querySelector(".remove-one").addEventListener("click", () => removeItem(item.id, false));
-      card.querySelector(".remove-all").addEventListener("click", () => removeItem(item.id, true));
-      container.append(card);
-    }
+    state.inventory = await api("/api/inventory");
+    updateFilterCounts();
+    renderInventory();
   } catch (error) {
     container.innerHTML = `<div class="empty error">${error.message}</div>`;
   }
+}
+
+function renderInventory() {
+  const container = $("#inventory");
+  container.replaceChildren();
+  if (!state.inventory.length) {
+    container.innerHTML = '<div class="empty"><strong>Your fridge log is empty.</strong><span>Scan your first item above.</span></div>';
+    return;
+  }
+
+  const items = state.inventory.filter((item) => {
+    if (state.filter === "all") return true;
+    return expirationState(item.expires_on).key === state.filter;
+  });
+  if (!items.length) {
+    container.innerHTML = '<div class="empty"><strong>Nothing in this group.</strong><span>Choose another filter to see more food.</span></div>';
+    return;
+  }
+
+  const template = $("#item-template");
+  for (const item of items) {
+    const dateState = expirationState(item.expires_on);
+    const card = template.content.firstElementChild.cloneNode(true);
+    card.classList.add(`date-${dateState.key}`);
+    card.querySelector("strong").textContent = item.name;
+    card.querySelector(".item-meta").textContent = item.expires_on ? `Expires ${formatDate(item.expires_on)}` : "No expiration date";
+    const badge = card.querySelector(".date-badge");
+    badge.textContent = dateState.label;
+    badge.classList.add(dateState.key);
+    card.querySelector("small").textContent = `Barcode ${item.barcode}`;
+    card.querySelector(".quantity").textContent = `x${item.quantity}`;
+    card.querySelector(".edit-item").addEventListener("click", () => openEditor(item));
+    card.querySelector(".remove-one").addEventListener("click", () => removeItem(item.id, false));
+    card.querySelector(".remove-all").addEventListener("click", () => removeItem(item.id, true));
+    container.append(card);
+  }
+}
+
+function expirationState(expiresOn) {
+  if (!expiresOn) return { key: "undated", label: "No date" };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + 3);
+  const expiration = new Date(`${expiresOn}T00:00:00`);
+  if (expiration < today) return { key: "expired", label: "Expired" };
+  if (expiration <= cutoff) {
+    return { key: "soon", label: expiration.getTime() === today.getTime() ? "Today" : "Soon" };
+  }
+  return { key: "fresh", label: "Fresh" };
+}
+
+function updateFilterCounts() {
+  const counts = { all: 0, expired: 0, soon: 0, undated: 0 };
+  for (const item of state.inventory) {
+    counts.all += item.quantity;
+    const key = expirationState(item.expires_on).key;
+    if (key in counts) counts[key] += item.quantity;
+  }
+  document.querySelectorAll(".filter").forEach((button) => {
+    button.querySelector("span").textContent = counts[button.dataset.filter];
+  });
+}
+
+function setInventoryFilter(filter) {
+  state.filter = filter;
+  document.querySelectorAll(".filter").forEach((button) => {
+    const active = button.dataset.filter === filter;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active);
+  });
+  renderInventory();
 }
 
 function openEditor(item) {
@@ -166,6 +223,9 @@ $("#lookup").addEventListener("click", () => lookupBarcode());
 $("#start-scan").addEventListener("click", startScanner);
 $("#stop-scan").addEventListener("click", stopScanner);
 $("#barcode-photo").addEventListener("change", scanPhoto);
+document.querySelectorAll(".filter").forEach((button) => {
+  button.addEventListener("click", () => setInventoryFilter(button.dataset.filter));
+});
 $("#close-edit").addEventListener("click", closeEditor);
 $("#edit-dialog").addEventListener("click", (event) => {
   if (event.target === $("#edit-dialog")) closeEditor();

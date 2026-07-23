@@ -55,13 +55,19 @@
           <div><p class="eyebrow">Inventory</p><h2>Your food</h2></div>
           <button id="refresh" class="secondary">Refresh</button>
         </div>
+        <div id="inventory-filters" class="filter-bar" aria-label="Filter inventory">
+          <button class="filter active" data-filter="all">All <span>0</span></button>
+          <button class="filter" data-filter="expired">Expired <span>0</span></button>
+          <button class="filter" data-filter="soon">Expiring soon <span>0</span></button>
+          <button class="filter" data-filter="undated">No date <span>0</span></button>
+        </div>
         <div id="inventory" class="inventory-list"></div>
       </section>
     </main>
 
     <template id="item-template">
       <article class="item-card">
-        <div class="item-main"><strong></strong><span class="item-meta"></span><small></small></div>
+        <div class="item-main"><div class="item-title"><strong></strong><span class="date-badge"></span></div><span class="item-meta"></span><small></small></div>
         <div class="item-actions"><span class="quantity"></span><button class="edit-item">Edit</button><button class="remove-one" aria-label="Remove one item">−1</button><button class="remove-all">Remove</button></div>
       </article>
     </template>
