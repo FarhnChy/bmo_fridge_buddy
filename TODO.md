@@ -65,6 +65,8 @@ plate, or ventilated project enclosure outside the fridge.
 - [x] Inventory editing and expiration filters are implemented.
 - [x] Barcode recognition is bundled for offline use.
 - [x] Automatic startup, verified daily backups, and private HTTPS setup are implemented.
+- [x] Read-only temperature graphs and shared phone/OLED BMO moods are implemented.
+- [ ] Verify every BMO expression and the revised layout on the physical OLED.
 - [ ] Install and verify the automatic services and HTTPS flow on the Raspberry Pi and phone.
 - [ ] Order/receive the waterproof DS18B20 sensors and SSD1306 OLED screens.
 - [ ] Connect and test the temperature sensor.
@@ -344,7 +346,6 @@ real DS18B20, OLED face, temperature status, logging, and inventory workflow.
 After that Version 1 checkpoint, possible Version 2 work includes:
 
 - Show a larger animated BMO face and personality in the phone app.
-- Add fridge temperature history graphs similar to a thermostat or AC app.
 - Add sustained warm-temperature, disconnected-sensor, and expiration alerts.
 - Finish the installable phone PWA experience with icons and offline guidance.
 - Add a backup restore workflow and a hardware/service health page.

@@ -53,6 +53,18 @@ def celsius_to_fahrenheit(temperature_c: float) -> float:
     return (temperature_c * (9 / 5)) + 32
 
 
+def get_bmo_mood(temperature_c: float | None) -> str:
+    """Return the face mood shared by the OLED and phone interface."""
+
+    status = classify_temperature_status(temperature_c)
+    return {
+        "No sensor": "sleepy",
+        "Too Cold!": "cold",
+        "Normal": "happy",
+        "Too Warm!": "worried",
+    }[status]
+
+
 @dataclass
 class AppState:
     """Small shared state object for the display loop and scanner thread."""
@@ -121,6 +133,7 @@ class BmoDisplay:
             temperature_f = celsius_to_fahrenheit(temperature)
             temp_text = f"{temperature_f:.1f} F"
         temp_status = classify_temperature_status(temperature)
+        mood = get_bmo_mood(temperature)
         message = str(state["last_message"])[:22]
         inventory_count = state["inventory_count"]
         expiring_count = state["expiring_count"]
@@ -128,7 +141,7 @@ class BmoDisplay:
         if not self.hardware_ready:
             terminal_status = (
                 f"[BMO] temp={temp_text} items={inventory_count} "
-                f"expiring={expiring_count} status={temp_status} msg={message}"
+                f"expiring={expiring_count} status={temp_status} mood={mood} msg={message}"
             )
             if terminal_status != self.last_terminal_status:
                 print(terminal_status)
@@ -142,17 +155,34 @@ class BmoDisplay:
 
         self.draw.rectangle((0, 0, 127, 63), outline=0, fill=0)
 
-        # Simple BMO face: eyes, smile, then status text below it.
-        self.draw.rectangle((8, 8, 30, 26), outline=255, fill=0)
-        self.draw.rectangle((98, 8, 120, 26), outline=255, fill=0)
-        self.draw.arc((44, 12, 84, 42), 20, 160, fill=255)
+        self.draw_bmo_face(mood)
 
-        self.draw.text((0, 36), f"{temp_text} {temp_status}", font=self.font, fill=255)
-        self.draw.text((0, 46), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
-        self.draw.text((0, 56), message, font=self.font, fill=255)
+        self.draw.text((0, 33), f"{temp_text} {temp_status}", font=self.font, fill=255)
+        self.draw.text((0, 43), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
+        self.draw.text((0, 53), message, font=self.font, fill=255)
 
         self.display.image(self.image)
         self.display.show()
+
+    def draw_bmo_face(self, mood: str) -> None:
+        assert self.draw is not None
+
+        if mood == "sleepy":
+            self.draw.line((10, 12, 30, 12), fill=255, width=2)
+            self.draw.line((98, 12, 118, 12), fill=255, width=2)
+            self.draw.line((52, 25, 76, 25), fill=255, width=2)
+        elif mood == "cold":
+            self.draw.rectangle((14, 8, 27, 19), outline=255, fill=0)
+            self.draw.rectangle((101, 8, 114, 19), outline=255, fill=0)
+            self.draw.line((48, 25, 56, 20, 64, 25, 72, 20, 80, 25), fill=255, width=2)
+        elif mood == "worried":
+            self.draw.ellipse((10, 5, 31, 23), outline=255, fill=0)
+            self.draw.ellipse((97, 5, 118, 23), outline=255, fill=0)
+            self.draw.arc((48, 20, 80, 38), 200, 340, fill=255, width=2)
+        else:
+            self.draw.rectangle((10, 6, 30, 22), outline=255, fill=0)
+            self.draw.rectangle((98, 6, 118, 22), outline=255, fill=0)
+            self.draw.arc((48, 12, 80, 29), 20, 160, fill=255, width=2)
 
 
 @contextmanager
@@ -515,6 +545,42 @@ def log_temperature(timestamp: datetime, temperature_c: float | None) -> None:
                 "" if temperature_c is None else f"{temperature_c:.3f}",
             ]
         )
+
+
+def read_temperature_history(hours: int = 24, limit: int = 1000) -> list[dict[str, object]]:
+    """Read valid recent sensor values without modifying the temperature log."""
+
+    if not TEMP_LOG_PATH.exists():
+        return []
+
+    cutoff = datetime.now() - timedelta(hours=hours)
+    points: list[dict[str, object]] = []
+    try:
+        with TEMP_LOG_PATH.open(newline="", encoding="utf-8") as csv_file:
+            for row in csv.DictReader(csv_file):
+                raw_timestamp = (row.get("timestamp") or "").strip()
+                raw_temperature = (row.get("temperature_c") or "").strip()
+                if not raw_timestamp or not raw_temperature:
+                    continue
+                try:
+                    timestamp = datetime.fromisoformat(raw_timestamp)
+                    temperature_c = float(raw_temperature)
+                except ValueError:
+                    continue
+                if timestamp < cutoff:
+                    continue
+                points.append(
+                    {
+                        "timestamp": timestamp.isoformat(timespec="seconds"),
+                        "temperature_c": round(temperature_c, 3),
+                        "temperature_f": round(celsius_to_fahrenheit(temperature_c), 1),
+                        "status": classify_temperature_status(temperature_c),
+                    }
+                )
+    except OSError as exc:
+        print(f"[history] Could not read temperature log: {exc}")
+        return []
+    return points[-limit:]
 
 
 def print_help() -> None:

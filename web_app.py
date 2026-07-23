@@ -43,8 +43,26 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
                     else None
                 ),
                 "temperature_status": bmo_fridge.classify_temperature_status(temperature_c),
+                "bmo_mood": bmo_fridge.get_bmo_mood(temperature_c),
                 "inventory_count": bmo_fridge.count_inventory(),
                 "expiring_count": len(bmo_fridge.get_expiring_items()),
+            }
+        )
+
+    @app.get("/api/temperature-history")
+    def temperature_history():
+        try:
+            hours = int(request.args.get("hours", "24"))
+        except ValueError:
+            return jsonify({"error": "Hours must be a number."}), 400
+        if hours not in {1, 24, 168}:
+            return jsonify({"error": "Hours must be 1, 24, or 168."}), 400
+        return jsonify(
+            {
+                "hours": hours,
+                "safe_min_f": bmo_fridge.FRIDGE_MIN_F,
+                "safe_max_f": bmo_fridge.FRIDGE_MAX_F,
+                "points": bmo_fridge.read_temperature_history(hours=hours),
             }
         )
 

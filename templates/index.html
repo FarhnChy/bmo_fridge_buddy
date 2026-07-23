@@ -11,7 +11,7 @@
   <body>
     <main class="shell">
       <header class="hero">
-        <div class="face" aria-hidden="true"><i></i><i></i><span></span></div>
+        <div id="bmo-face" class="face sleepy" role="img" aria-label="BMO is waiting for the temperature sensor"><i></i><i></i><span></span></div>
         <div>
           <p class="eyebrow">BMO Fridge Buddy</p>
           <h1>What’s in the fridge?</h1>
@@ -48,6 +48,25 @@
           <button type="submit" class="primary wide">Add to fridge</button>
         </form>
         <p id="form-message" class="message" role="status"></p>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Temperature</p><h2>Fridge history</h2></div>
+          <div class="range-picker" aria-label="Temperature graph range">
+            <button class="range" data-hours="1">1h</button>
+            <button class="range active" data-hours="24">24h</button>
+            <button class="range" data-hours="168">7d</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="temperature-chart" aria-label="Fridge temperature history graph"></canvas>
+          <div id="chart-empty" class="empty chart-empty" hidden>
+            <strong>BMO is waiting for temperature data.</strong>
+            <span>The graph will appear after the real sensor records readings.</span>
+          </div>
+        </div>
+        <div class="chart-legend"><span><i class="safe-key"></i>Safe range 32-40 F</span><span id="chart-summary">No readings yet</span></div>
       </section>
 
       <section class="panel inventory-panel">

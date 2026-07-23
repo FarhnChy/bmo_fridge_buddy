@@ -29,12 +29,32 @@ class WebAppTest(unittest.TestCase):
         self.assertIn(b'data-filter="expired"', response.data)
         self.assertIn(b"vendor/zxing-browser.min.js", response.data)
         self.assertNotIn(b"unpkg.com", response.data)
+        self.assertIn(b"Fridge history", response.data)
+        self.assertIn(b"temperature-chart", response.data)
 
     def test_vendored_barcode_reader_is_served(self):
         response = self.client.get("/static/vendor/zxing-browser.min.js")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"BrowserMultiFormatReader", response.data)
         response.close()
+
+    @patch.object(bmo_fridge, "read_temperature_history")
+    def test_temperature_history_endpoint(self, history):
+        history.return_value = [
+            {
+                "timestamp": "2026-07-23T12:00:00",
+                "temperature_c": 4.0,
+                "temperature_f": 39.2,
+                "status": "Normal",
+            }
+        ]
+        response = self.client.get("/api/temperature-history?hours=24")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["points"][0]["temperature_f"], 39.2)
+
+    def test_rejects_unsupported_history_range(self):
+        response = self.client.get("/api/temperature-history?hours=12")
+        self.assertEqual(response.status_code, 400)
 
     @patch.object(bmo_fridge, "fetch_product_details")
     def test_lookup_returns_product(self, lookup):

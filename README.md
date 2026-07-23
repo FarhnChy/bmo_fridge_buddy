@@ -19,6 +19,8 @@ The finished project will:
 - Store food quantities and expiration dates in a local SQLite database.
 - Warn about food that is expiring soon.
 - Save temperature history to a CSV file.
+- Graph recent temperature history with a highlighted 32-40 F safe band.
+- Give BMO sleepy, happy, cold, and worried expressions based on temperature.
 
 The main application is [bmo_fridge.py](bmo_fridge.py). Current progress,
 remaining setup, wiring, testing, and update instructions are in
@@ -28,8 +30,10 @@ remaining setup, wiring, testing, and update instructions are in
 
 The phone-friendly web app can scan a product barcode, look up its name with
 Open Food Facts, save quantity and expiration date, list the fridge inventory,
-and remove items. Different expiration dates are kept as separate batches even
-when the barcode is the same.
+remove items, and graph temperature history. Different expiration dates are
+kept as separate batches even when the barcode is the same. The phone and OLED
+share the same BMO mood rules; the physical OLED expressions still require
+verification on the real screen.
 
 On the Raspberry Pi:
 

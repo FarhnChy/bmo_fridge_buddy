@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { scanner: null, scanLocked: false, product: null, inventory: [], filter: "all" };
+const state = { scanner: null, scanLocked: false, product: null, inventory: [], filter: "all", history: null, historyHours: 24 };
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -210,9 +210,104 @@ async function loadStatus() {
     const status = await api("/api/status");
     const temperature = status.temperature_f === null ? "No temperature sensor" : `${status.temperature_f}°F · ${status.temperature_status}`;
     $("#status-line").textContent = `${temperature} · ${status.inventory_count} items · ${status.expiring_count} expiring soon`;
+    const face = $("#bmo-face");
+    face.className = `face ${status.bmo_mood}`;
+    face.setAttribute("aria-label", `BMO mood: ${status.bmo_mood}. ${temperature}`);
   } catch {
     $("#status-line").textContent = "Fridge status unavailable";
   }
+}
+
+async function loadTemperatureHistory(hours = state.historyHours) {
+  state.historyHours = hours;
+  document.querySelectorAll(".range").forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.hours) === hours);
+  });
+  try {
+    state.history = await api(`/api/temperature-history?hours=${hours}`);
+    drawTemperatureChart();
+  } catch (error) {
+    state.history = null;
+    $("#temperature-chart").hidden = true;
+    $("#chart-empty").hidden = false;
+    $("#chart-summary").textContent = error.message;
+  }
+}
+
+function drawTemperatureChart() {
+  const canvas = $("#temperature-chart");
+  const empty = $("#chart-empty");
+  const points = state.history?.points || [];
+  if (!points.length) {
+    canvas.hidden = true;
+    empty.hidden = false;
+    $("#chart-summary").textContent = "No readings yet";
+    return;
+  }
+
+  canvas.hidden = false;
+  empty.hidden = true;
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(canvas.clientWidth, 280);
+  const height = 230;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  const context = canvas.getContext("2d");
+  context.scale(ratio, ratio);
+
+  const padding = { left: 38, right: 12, top: 12, bottom: 28 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const temperatures = points.map((point) => point.temperature_f);
+  const minimum = Math.floor(Math.min(...temperatures, state.history.safe_min_f) - 2);
+  const maximum = Math.ceil(Math.max(...temperatures, state.history.safe_max_f) + 2);
+  const timestamps = points.map((point) => new Date(point.timestamp).getTime());
+  const timeMin = Math.min(...timestamps);
+  const timeMax = Math.max(...timestamps);
+  const x = (timestamp) => padding.left + (timeMax === timeMin ? plotWidth / 2 : ((timestamp - timeMin) / (timeMax - timeMin)) * plotWidth);
+  const y = (temperature) => padding.top + ((maximum - temperature) / (maximum - minimum)) * plotHeight;
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "rgba(98, 185, 170, 0.18)";
+  context.fillRect(padding.left, y(state.history.safe_max_f), plotWidth, y(state.history.safe_min_f) - y(state.history.safe_max_f));
+
+  context.strokeStyle = "#d7dfd8";
+  context.lineWidth = 1;
+  context.fillStyle = "#647a78";
+  context.font = "11px system-ui";
+  context.textAlign = "right";
+  for (const temperature of [minimum, state.history.safe_min_f, state.history.safe_max_f, maximum]) {
+    context.beginPath();
+    context.moveTo(padding.left, y(temperature));
+    context.lineTo(width - padding.right, y(temperature));
+    context.stroke();
+    context.fillText(`${temperature}°`, padding.left - 6, y(temperature) + 4);
+  }
+
+  context.strokeStyle = "#327e74";
+  context.lineWidth = 2.5;
+  context.lineJoin = "round";
+  context.beginPath();
+  points.forEach((point, index) => {
+    const pointX = x(timestamps[index]);
+    const pointY = y(point.temperature_f);
+    if (index === 0) context.moveTo(pointX, pointY);
+    else context.lineTo(pointX, pointY);
+  });
+  context.stroke();
+
+  const last = points.at(-1);
+  context.fillStyle = last.temperature_f > state.history.safe_max_f || last.temperature_f < state.history.safe_min_f ? "#bf4d45" : "#327e74";
+  context.beginPath();
+  context.arc(x(timestamps.at(-1)), y(last.temperature_f), 4, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#647a78";
+  context.textAlign = "left";
+  context.fillText(new Date(timeMin).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), padding.left, height - 8);
+  context.textAlign = "right";
+  context.fillText(new Date(timeMax).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), width - padding.right, height - 8);
+  $("#chart-summary").textContent = `${last.temperature_f.toFixed(1)}°F latest · ${points.length} readings`;
 }
 
 function formatDate(value) {
@@ -223,6 +318,9 @@ $("#lookup").addEventListener("click", () => lookupBarcode());
 $("#start-scan").addEventListener("click", startScanner);
 $("#stop-scan").addEventListener("click", stopScanner);
 $("#barcode-photo").addEventListener("change", scanPhoto);
+document.querySelectorAll(".range").forEach((button) => {
+  button.addEventListener("click", () => loadTemperatureHistory(Number(button.dataset.hours)));
+});
 document.querySelectorAll(".filter").forEach((button) => {
   button.addEventListener("click", () => setInventoryFilter(button.dataset.filter));
 });
@@ -250,7 +348,8 @@ $("#edit-form").addEventListener("submit", async (event) => {
     message.classList.add("error");
   }
 });
-$("#refresh").addEventListener("click", () => Promise.all([loadInventory(), loadStatus()]));
+$("#refresh").addEventListener("click", () => Promise.all([loadInventory(), loadStatus(), loadTemperatureHistory()]));
+window.addEventListener("resize", () => { if (state.history) drawTemperatureChart(); });
 $("#barcode").addEventListener("input", () => { state.product = null; $("#product-preview").hidden = true; });
 $("#item-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -273,3 +372,4 @@ if (window.isSecureContext) {
 }
 loadInventory();
 loadStatus();
+loadTemperatureHistory();
