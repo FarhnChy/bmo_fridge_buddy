@@ -60,3 +60,46 @@ python web_app.py
 
 Keep this development server on a trusted home network. Do not expose it
 directly to the public internet; Version 2 does not yet include user accounts.
+
+## Install as an always-on Pi service
+
+After testing both applications manually, install the web app, hardware
+monitor, and daily backup timer:
+
+```bash
+cd ~/bmo_fridge_buddy
+git pull --ff-only
+source .venv/bin/activate
+python -m pip install -r requirements-rpi.txt
+bash scripts/install_pi_services.sh
+```
+
+The installer starts both applications after every boot and immediately makes
+a verified inventory backup. It then keeps 14 daily backups in
+`~/bmo_fridge_backups`. Check them with:
+
+```bash
+sudo systemctl status bmo-fridge-web bmo-fridge-monitor bmo-fridge-backup.timer
+ls -lh ~/bmo_fridge_backups
+```
+
+These copies protect against accidental database changes or corruption. They
+remain on the same SD card, so occasionally copy the backup folder to another
+computer if protection from complete SD-card failure matters.
+
+## Private trusted HTTPS for live scanning
+
+The recommended HTTPS option is Tailscale Serve. It keeps BMO private to your
+Tailscale devices, provides a trusted certificate, and lets the web server
+listen only on the Pi itself. Install Tailscale on the Pi and phone, sign both
+into the same account, then run on the Pi:
+
+```bash
+sudo tailscale up
+cd ~/bmo_fridge_buddy
+bash scripts/enable_tailscale_https.sh
+```
+
+The command prints the private `https://...ts.net` address to open on the
+phone. Do not enable Tailscale Funnel; this project is intended to remain
+private rather than publicly accessible.

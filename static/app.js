@@ -268,5 +268,8 @@ $("#item-form").addEventListener("submit", async (event) => {
   }
 });
 window.addEventListener("pagehide", stopScanner);
+if (window.isSecureContext) {
+  $("#camera-note").textContent = "Secure camera access is ready. Use Live scan for the fastest entry.";
+}
 loadInventory();
 loadStatus();

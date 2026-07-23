@@ -6,6 +6,7 @@ __pycache__/
 fridge.db
 temperature_log.csv
 tests/.test_inventory.db
+tests/.backup_test/
 
 # Local environments and editor files
 .venv/

@@ -5,3 +5,4 @@ pillow
 
 # Phone-friendly inventory and barcode scanner web app
 flask
+waitress

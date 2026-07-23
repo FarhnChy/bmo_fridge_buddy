@@ -148,10 +148,15 @@ app = create_app()
 
 
 if __name__ == "__main__":
+    host = os.environ.get("BMO_WEB_HOST", "0.0.0.0")
     port = int(os.environ.get("BMO_WEB_PORT", "5000"))
     cert = os.environ.get("BMO_TLS_CERT")
     key = os.environ.get("BMO_TLS_KEY")
     if bool(cert) != bool(key):
         raise SystemExit("Set both BMO_TLS_CERT and BMO_TLS_KEY, or neither.")
-    ssl_context = (cert, key) if cert and key else None
-    app.run(host="0.0.0.0", port=port, debug=False, ssl_context=ssl_context)
+    if cert and key:
+        app.run(host=host, port=port, debug=False, ssl_context=(cert, key))
+    else:
+        from waitress import serve
+
+        serve(app, host=host, port=port, threads=4)

@@ -23,6 +23,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+import os
 
 
 APP_NAME = "BMO Fridge"
@@ -625,12 +626,13 @@ def main() -> None:
     state = AppState()
     display = BmoDisplay()
 
-    listener = threading.Thread(
-        target=scanner_listener,
-        args=(state,),
-        daemon=True,
-    )
-    listener.start()
+    if os.environ.get("BMO_TERMINAL_INPUT", "1") != "0":
+        listener = threading.Thread(
+            target=scanner_listener,
+            args=(state,),
+            daemon=True,
+        )
+        listener.start()
 
     next_temperature_log = 0.0
     next_expiration_check = 0.0
