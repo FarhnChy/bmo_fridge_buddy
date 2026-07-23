@@ -55,6 +55,29 @@ class WebAppTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_edits_inventory_item(self):
+        created = self.client.post(
+            "/api/inventory",
+            json={"barcode": "12345678", "name": "Milk", "quantity": 1},
+        )
+        self.assertEqual(created.status_code, 201)
+        item = self.client.get("/api/inventory").get_json()[0]
+
+        response = self.client.patch(
+            f"/api/inventory/{item['id']}",
+            json={
+                "barcode": "12345678",
+                "name": "Whole Milk",
+                "quantity": 3,
+                "expires_on": "2026-08-15",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        updated = self.client.get("/api/inventory").get_json()[0]
+        self.assertEqual(updated["name"], "Whole Milk")
+        self.assertEqual(updated["quantity"], 3)
+        self.assertEqual(updated["expires_on"], "2026-08-15")
+
     def test_migrates_existing_inventory_without_losing_items(self):
         self.db_path.unlink(missing_ok=True)
         with closing(sqlite3.connect(self.db_path)) as connection:

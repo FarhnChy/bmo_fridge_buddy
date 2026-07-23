@@ -62,9 +62,24 @@
     <template id="item-template">
       <article class="item-card">
         <div class="item-main"><strong></strong><span class="item-meta"></span><small></small></div>
-        <div class="item-actions"><span class="quantity"></span><button class="remove-one" aria-label="Remove one item">−1</button><button class="remove-all">Remove</button></div>
+        <div class="item-actions"><span class="quantity"></span><button class="edit-item">Edit</button><button class="remove-one" aria-label="Remove one item">−1</button><button class="remove-all">Remove</button></div>
       </article>
     </template>
+
+    <dialog id="edit-dialog">
+      <form id="edit-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Inventory</p><h2>Edit item</h2></div><button id="close-edit" type="button" class="icon-button" aria-label="Close">×</button></div>
+        <input id="edit-id" type="hidden">
+        <label>Barcode<input id="edit-barcode" inputmode="numeric" required></label>
+        <label>Item name<input id="edit-name" maxlength="160" required></label>
+        <div class="form-row">
+          <label>Expiration date<input id="edit-expires-on" type="date"></label>
+          <label>Quantity<input id="edit-quantity" type="number" min="1" max="99" required></label>
+        </div>
+        <button type="submit" class="primary wide">Save changes</button>
+        <p id="edit-message" class="message" role="status"></p>
+      </form>
+    </dialog>
 
     <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>

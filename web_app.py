@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
@@ -85,6 +86,40 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
     def remove_inventory(item_id: int):
         remove_all = request.args.get("all") == "1"
         message = bmo_fridge.remove_item_by_id(item_id, remove_all=remove_all)
+        if message is None:
+            return jsonify({"error": "Inventory item was not found."}), 404
+        return jsonify({"message": message})
+
+    @app.patch("/api/inventory/<int:item_id>")
+    def update_inventory(item_id: int):
+        payload = request.get_json(silent=True) or {}
+        barcode = normalize_barcode(payload.get("barcode"))
+        if barcode is None:
+            return jsonify({"error": "Enter a barcode containing 4 to 18 digits."}), 400
+
+        name = str(payload.get("name") or "").strip()[:160]
+        if not name:
+            return jsonify({"error": "Enter an item name."}), 400
+
+        expires_on = normalize_expiration(payload.get("expires_on"))
+        if expires_on is False:
+            return jsonify({"error": "Expiration date must use YYYY-MM-DD."}), 400
+
+        try:
+            quantity = int(payload.get("quantity", 1))
+        except (TypeError, ValueError):
+            quantity = 0
+        if not 1 <= quantity <= 99:
+            return jsonify({"error": "Quantity must be between 1 and 99."}), 400
+
+        try:
+            message = bmo_fridge.update_item_by_id(
+                item_id, barcode, name, quantity, expires_on
+            )
+        except sqlite3.IntegrityError:
+            return jsonify(
+                {"error": "That barcode and expiration date already exist. Edit the existing batch instead."}
+            ), 409
         if message is None:
             return jsonify({"error": "Inventory item was not found."}), 404
         return jsonify({"message": message})

@@ -316,6 +316,41 @@ def remove_item_by_id(item_id: int, remove_all: bool = False) -> str | None:
         return f"Removed {item['name']}"
 
 
+def update_item_by_id(
+    item_id: int,
+    barcode: str,
+    name: str,
+    quantity: int,
+    expires_on: str | None,
+) -> str | None:
+    """Update one dated inventory batch from the web interface."""
+
+    with connect_db() as connection:
+        existing = connection.execute(
+            "SELECT id FROM inventory WHERE id = ?",
+            (item_id,),
+        ).fetchone()
+        if existing is None:
+            return None
+
+        connection.execute(
+            """
+            UPDATE inventory
+            SET barcode = ?, name = ?, quantity = ?, expires_on = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                barcode,
+                name,
+                quantity,
+                expires_on,
+                datetime.now().isoformat(timespec="seconds"),
+                item_id,
+            ),
+        )
+        return f"Updated {name}"
+
+
 def list_inventory(limit: int = 10) -> list[sqlite3.Row]:
     with connect_db() as connection:
         return connection.execute(

@@ -114,6 +114,7 @@ async function loadInventory() {
       card.querySelector(".item-meta").textContent = item.expires_on ? `Expires ${formatDate(item.expires_on)}` : "No expiration date";
       card.querySelector("small").textContent = `Barcode ${item.barcode}`;
       card.querySelector(".quantity").textContent = `×${item.quantity}`;
+      card.querySelector(".edit-item").addEventListener("click", () => openEditor(item));
       card.querySelector(".remove-one").addEventListener("click", () => removeItem(item.id, false));
       card.querySelector(".remove-all").addEventListener("click", () => removeItem(item.id, true));
       container.append(card);
@@ -121,6 +122,20 @@ async function loadInventory() {
   } catch (error) {
     container.innerHTML = `<div class="empty error">${error.message}</div>`;
   }
+}
+
+function openEditor(item) {
+  $("#edit-id").value = item.id;
+  $("#edit-barcode").value = item.barcode;
+  $("#edit-name").value = item.name;
+  $("#edit-expires-on").value = item.expires_on || "";
+  $("#edit-quantity").value = item.quantity;
+  $("#edit-message").textContent = "";
+  $("#edit-dialog").showModal();
+}
+
+function closeEditor() {
+  $("#edit-dialog").close();
 }
 
 async function removeItem(id, all) {
@@ -151,6 +166,30 @@ $("#lookup").addEventListener("click", () => lookupBarcode());
 $("#start-scan").addEventListener("click", startScanner);
 $("#stop-scan").addEventListener("click", stopScanner);
 $("#barcode-photo").addEventListener("change", scanPhoto);
+$("#close-edit").addEventListener("click", closeEditor);
+$("#edit-dialog").addEventListener("click", (event) => {
+  if (event.target === $("#edit-dialog")) closeEditor();
+});
+$("#edit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = $("#edit-id").value;
+  const payload = {
+    barcode: $("#edit-barcode").value,
+    name: $("#edit-name").value,
+    expires_on: $("#edit-expires-on").value,
+    quantity: $("#edit-quantity").value,
+  };
+  try {
+    const result = await api(`/api/inventory/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    closeEditor();
+    setMessage(result.message);
+    await Promise.all([loadInventory(), loadStatus()]);
+  } catch (error) {
+    const message = $("#edit-message");
+    message.textContent = error.message;
+    message.classList.add("error");
+  }
+});
 $("#refresh").addEventListener("click", () => Promise.all([loadInventory(), loadStatus()]));
 $("#barcode").addEventListener("input", () => { state.product = null; $("#product-preview").hidden = true; });
 $("#item-form").addEventListener("submit", async (event) => {
