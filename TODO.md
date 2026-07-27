@@ -3,53 +3,48 @@
 This file contains the remaining project plan, hardware instructions, test
 steps, and commands needed to finish the project.
 
-## Tomorrow: start here
+## Start here: remaining hardware work
 
-The target for one six-hour work session is a complete Version 1 prototype:
-the real probe reports fridge temperature, the outside OLED displays it, the
-inventory commands work, and readings are logged. Hardware troubleshooting may
-push final testing into a second session; do not rush or connect power to save
-time.
+The software is implemented. The remaining goal is to connect and prove one
+pluggable DS18B20 probe and one OLED on the Raspberry Pi 5, then run the final
+hardware and application checks. Work through these checkpoints in order:
 
-When ready, say **"I'm ready to finish BMO Fridge Buddy."** Start with the Pi
-unplugged and do not pre-wire anything. Work through one checkpoint at a time:
-
-1. **Parts and photos (30 minutes):** Lay out and photograph the Pi case and
-   exposed GPIO header, both sides of the breadboard, sensor labels and wire
-   ends, both sides of the OLED, jumper-wire ends, and resistor.
-2. **DS18B20 only (60-90 minutes):** Identify every connection, build the
-   sensor circuit with power disconnected, review it, enable 1-Wire, and prove
-   that it reports a sensible room temperature.
-3. **OLED (45-90 minutes):** Shut down and unplug again, add the outside OLED,
-   enable I2C, detect its address, and display the BMO face and temperature.
-4. **Application (45-60 minutes):** Test help, adding, invalid dates, listing,
-   expiring items, removing, quitting, and temperature logging.
-5. **Fridge test (30-60 minutes of active work):** Put only the metal probe
-   inside, route its cable safely, confirm the door seal, and leave it logging.
-6. **Buffer and finish (remaining time):** Troubleshoot, tidy the loose setup,
-   capture evidence, update these checkboxes, and commit the tested result.
+1. **Receive and inspect the pluggable probe kit:** Photograph the probe plug,
+   adapter labels, and both sides of the adapter. Confirm it has an onboard
+   pull-up resistor before connecting anything.
+2. **Temperature sensor only:** With power disconnected, plug the probe into
+   its adapter and connect the adapter directly to three Pi GPIO pins. Get the
+   wiring reviewed before applying power. Enable 1-Wire and prove the probe
+   reports a sensible room temperature.
+3. **OLED:** Shut down and unplug again. Connect the OLED directly to four
+   separate Pi GPIO pins, review the wiring, enable I2C, detect the display,
+   and show the BMO face and temperature.
+4. **Complete application test:** Verify temperature logging, OLED statuses,
+   inventory, barcode input, web access, automatic services, and backups.
+5. **Fridge test:** Put only the sealed metal probe inside, route its cable
+   safely, confirm the door seal, and run a several-hour logging test.
 
 The fridge can log temperatures unattended while work continues on another
 project. Never leave an unverified or unstable electrical setup unattended.
 
-### Have these ready
+### Parts used in the final build
 
-- Raspberry Pi 4 in its case, USB-C power supply, and a way to use its terminal
-- Mini breadboard and female-to-male jumper wires
-- Waterproof three-wire DS18B20 sensor and one 4.7 kOhm resistor
-- Four-pin I2C SSD1306 OLED
+- Raspberry Pi 5 in its case, correct USB-C power supply, and microSD card
+- One pluggable waterproof DS18B20 probe with its matching adapter module
+- Three female-to-female jumper wires for the probe adapter
+- One four-pin I2C SSD1306 OLED
+- Four female-to-female jumper wires for the OLED
 - Keyboard, or a computer that can connect to the Pi through SSH
 - Phone camera for wiring checks and final evidence
 - Optional USB barcode scanner
 - Optional separate fridge thermometer for later accuracy comparison
 - Optional dry plastic tray or non-conductive board to keep the loose parts together
 
-Do not peel the breadboard's adhesive backing or permanently mount anything
-before the complete circuit works. The Pi can remain in its black case if its
-GPIO header is accessible. The breadboard stays outside the case, loose beside
-the Pi during testing. It does not need to be glued to the fridge. Afterward,
-the Pi, breadboard, and OLED may simply share a portable dry tray, mounting
-plate, or ventilated project enclosure outside the fridge.
+The mini breadboard, male-to-female jumpers, male-to-male jumpers, and loose
+4.7 kOhm resistors are **not used** when the adapter has a verified onboard
+pull-up resistor. Keep them as spare prototyping parts. The Pi can remain in
+its black case if the GPIO header is accessible. Keep the Pi, adapter, and OLED
+on a dry non-conductive surface outside the fridge.
 
 ## Current progress
 
@@ -68,33 +63,40 @@ plate, or ventilated project enclosure outside the fridge.
 - [x] Read-only temperature graphs and shared phone/OLED BMO moods are implemented.
 - [ ] Verify every BMO expression and the revised layout on the physical OLED.
 - [ ] Install and verify the automatic services and HTTPS flow on the Raspberry Pi and phone.
-- [ ] Order/receive the waterproof DS18B20 sensors and SSD1306 OLED screens.
+- [x] Receive and inspect the OLED screens and original bare-wire DS18B20 probes.
+- [ ] Receive and inspect a pluggable DS18B20 probe-and-adapter kit.
 - [ ] Connect and test the temperature sensor.
 - [ ] Connect and test the OLED.
 - [ ] Test the full inventory workflow and finish the physical build.
 
-## Parts
+## Selected hardware
 
-- Raspberry Pi 4 and power supply
-- Mini solderless breadboard
-- Jumper wires
-- One waterproof, three-wire DS18B20 temperature sensor
-- One 4.7 kOhm resistor
+- Raspberry Pi 5, case with fan, power supply, and microSD card
+- One pluggable waterproof DS18B20 probe and matching adapter module
+- Seven female-to-female jumper wires total: three for the probe and four for
+  the OLED
 - One 0.96-inch, 128x64, SSD1306 I2C OLED with four attached pins
 - Optional USB barcode scanner
 
 Selected parts:
 
 - [Hosyond SSD1306 OLED five-pack](https://www.amazon.com/dp/B0BFD4X6YV)
-- [WWZMDiB waterproof DS18B20 five-pack](https://www.amazon.com/dp/B0C8J77NJR)
+- [Gikfun pluggable DS18B20 probes with adapter modules](https://www.amazon.com/dp/B08V93CTM2)
 
-The selected sensor listing documents red as VCC, yellow as DATA, and black as
-GND. Check the labels and included instructions again when the actual parts
-arrive. Do not assume wire colors for a different sensor.
+The original
+[WWZMDiB bare-wire probe pack](https://www.amazon.com/dp/B0C8J77NJR) is
+electrically compatible, but its fine stranded leads do not stay securely in
+the mini breadboard. Do not tape those leads into place or power that unstable
+connection. Return that pack if practical or keep it only for a future project
+with properly crimped, soldered, or screw-terminal connections.
+
+The replacement listing describes a pluggable probe, matching adapter, and an
+onboard pull-up resistor. Verify the actual labels and adapter after delivery;
+do not rely only on listing photos or wire order.
 
 ## What goes inside and outside the fridge
 
-The Raspberry Pi is not installed inside the fridge. The breadboard and OLED
+The Raspberry Pi is not installed inside the fridge. The probe adapter and OLED
 also stay outside. They are ordinary electronics and are not protected from
 condensation.
 
@@ -103,7 +105,7 @@ condensation.
 | Waterproof metal DS18B20 probe | Inside the fridge | This is the part that senses the cold air. |
 | DS18B20 cable | Runs from inside to outside | It carries power and temperature data between the probe and Pi. |
 | Raspberry Pi and power supply | Outside the fridge | They must stay dry and need ventilation and mains power. |
-| Breadboard and resistor | Outside, beside the Pi | They make the electrical connections and must stay dry. |
+| Probe adapter | Outside, beside the Pi | It connects the probe and provides the required pull-up resistor. |
 | OLED screen | Outside, where it can be viewed | It is not waterproof and displays the temperature read by the inside probe. |
 | Optional USB barcode scanner | Outside | It plugs into the Pi and is used when adding or removing food. |
 
@@ -112,11 +114,11 @@ The finished physical arrangement is:
 ```text
 INSIDE FRIDGE                     OUTSIDE FRIDGE
 
-waterproof metal probe ----cable---- breadboard ---- jumper wires ---- Raspberry Pi
-                                      |                                  |
-                                 4.7 kOhm resistor                    USB power
-                                                                         |
-                                                                  OLED and scanner
+waterproof metal probe ----cable/plug---- adapter ---- jumper wires ---- Raspberry Pi
+                                             |                              |
+                                   onboard pull-up resistor             USB power
+                                                                            |
+                                                                     OLED and scanner
 ```
 
 Only the sealed metal probe should be inside. The OLED stays outside so it is
@@ -140,98 +142,70 @@ be hidden in its walls. If the door cannot close and seal safely around the
 cable, stop and choose another non-destructive cable route or a purpose-made
 fridge cable pass-through.
 
-## What the breadboard does
+## Why the breadboard is no longer used
 
-The breadboard does not fit into the Pi. It is a separate plastic connection
-board that sits next to the Pi. Jumper wires connect holes on the breadboard to
-the exposed GPIO pins on top of the Pi.
+The original plan used a breadboard and a loose 4.7 kOhm resistor because the
+original probe ended in three bare wires. Those stranded leads proved too thin
+and flexible to make a secure breadboard connection. Tape is not an acceptable
+electrical connection.
 
-A breadboard lets several wires meet without soldering:
+The replacement probe plugs into an adapter module. The adapter provides solid
+header pins and the required pull-up resistor, so it connects directly to the
+Pi with female-to-female jumpers. This removes the breadboard, separate
+resistor, and male-ended jumper wires from the finished design.
 
-- Holes along a `+` power rail are electrically connected to each other.
-- Holes along a `-` ground rail are electrically connected to each other.
-- Each short numbered group of holes in the center is connected together.
-- The two sides of the center gap are not connected to each other.
-
-Some small breadboards label or split their rails differently. Confirm the
-printed markings or test continuity rather than assuming every rail runs the
-full length.
-
-If the waterproof sensor ends in loose, flexible stranded wires, do not force
-frayed strands into the breadboard. Use a suitable three-position terminal
-adapter, pre-crimped connector, or properly attached male jumper leads. Do not
-make these connections while the Pi is powered.
-
-## Next steps when the parts arrive
+## Next steps when the pluggable probe arrives
 
 1. Keep the Raspberry Pi shut down and unplugged.
-2. Photograph and inspect the actual sensor, OLED, resistor, and connectors.
-3. Connect and test only the DS18B20 first.
-4. Enable 1-Wire and confirm the Pi detects the sensor.
-5. Shut down and unplug the Pi again.
-6. Add the OLED separately.
-7. Enable I2C and confirm the Pi detects the OLED.
-8. Run the complete application and test every feature.
+2. Photograph the probe plug, adapter labels, and both sides of the adapter.
+3. Confirm the adapter has an onboard pull-up resistor.
+4. Connect and test only the DS18B20 and adapter first.
+5. Enable 1-Wire and confirm the Pi detects the sensor.
+6. Shut down and unplug the Pi again.
+7. Add the OLED using its own power and ground pins.
+8. Enable I2C and confirm the Pi detects the OLED.
+9. Run the complete application and test every feature.
 
-Do not open or disassemble the Raspberry Pi. All project connections use its
-exposed 40-pin GPIO header and the breadboard.
+Do not disassemble the Raspberry Pi. All project connections use its exposed
+40-pin GPIO header. Leave the separate four-wire Pi 5 fan connector alone.
 
-## Temperature sensor wiring
+## Temperature sensor wiring: adapter directly to Raspberry Pi 5
 
-Always shut down and unplug the Pi before changing wires. Use the physical pin
-numbers in this table.
+Always shut down and unplug the Pi before changing wires. First plug the probe
+into its matching adapter. Follow the **printed adapter labels**, not an assumed
+left-to-right order.
 
-| DS18B20 wire | Breadboard connection | Raspberry Pi connection |
-|---|---|---|
-| Red / VCC | Positive rail | 3.3 V, physical pin 1 |
-| Yellow / DATA | One numbered signal row | GPIO4, physical pin 7 |
-| Black / GND | Ground rail | Ground, physical pin 6 |
+| Adapter label | Raspberry Pi connection | Physical pin |
+|---|---|---:|
+| `VCC`, `+`, or `3V3` | 3.3 V power | 1 |
+| `GND` or `-` | Ground | 6 |
+| `DATA`, `DAT`, `DQ`, or `S` | GPIO4 / 1-Wire data | 7 |
 
-Place one leg of the 4.7 kOhm resistor in the same numbered row as DATA. Place
-the other resistor leg in the 3.3 V positive rail. A resistor has no direction.
+Use three female-to-female jumpers. The adapter end fits its male output pins;
+the other end fits over the Pi's male GPIO pins. Do not use the breadboard,
+male-to-female jumpers, male-to-male jumpers, or a separate 4.7 kOhm resistor
+when the adapter's onboard pull-up resistor has been verified.
 
-The resistor is a pull-up: it holds the DATA line at a stable voltage so the Pi
-can reliably communicate with the sensor. Never connect this circuit to a 5 V
-GPIO signal, and never move wires while the Pi is powered.
+### Raspberry Pi 5 header orientation
 
-In plain language, the three sensor connections are:
+With the GPIO header above the heatsink and the case edge above the header,
+start at the end beside the round yellow mounting hole, away from the fan plug:
 
 ```text
-Pi physical pin 1 (3.3 V power) ----+---- sensor VCC/red
-                                    |
-                              4.7 kOhm resistor
-                                    |
-Pi physical pin 7 (GPIO4 data) -----+---- sensor DATA/yellow
-
-Pi physical pin 6 (ground) -------------- sensor GND/black
+Case edge / outside row
+Pin 2 (5 V)   Pin 4 (5 V)   Pin 6 (GND)   Pin 8
+Pin 1 (3.3 V) Pin 3         Pin 5         Pin 7 (GPIO4)
+Heatsink / inside row
 ```
 
-The resistor is on the breadboard between the power connection and DATA
-connection. It is not placed inside the Raspberry Pi or inside the fridge.
+Connect one wire at a time with power disconnected:
 
-### Beginner connection sequence
-
-1. Shut down the Pi, unplug its USB-C power cable, and wait for its lights to go
-   out.
-2. Place the Pi and breadboard beside each other on a dry, non-metal surface.
-3. Identify physical GPIO pins 1, 6, and 7 using a Raspberry Pi 4 pin diagram.
-   Physical pin numbers describe positions on the header; `GPIO4` is the signal
-   name for physical pin 7.
-4. Run a female-to-male jumper from Pi physical pin 1 to the breadboard `+`
-   rail. This brings safe 3.3 V power to that rail.
-5. Run another jumper from Pi physical pin 6 to the breadboard `-` rail. This
-   creates the ground connection.
-6. Choose one unused numbered center row as the DATA row. Run a jumper from Pi
-   physical pin 7 to that row.
-7. Connect sensor VCC/red to the `+` rail, sensor GND/black to the `-` rail, and
-   sensor DATA/yellow to the chosen DATA row.
-8. Put one leg of the 4.7 kOhm resistor into the DATA row and its other leg into
-   the `+` rail. Resistor direction does not matter.
-9. Before restoring power, trace every connection from beginning to end. Make
-   sure nothing is connected to a 5 V pin and no loose wire strands touch a
-   neighboring connection.
-10. Leave the probe outside the fridge for the first software test. Put it
-    inside only after the Pi detects it and reports a sensible room temperature.
+1. Adapter `VCC`/`+` to physical pin 1.
+2. Adapter `GND`/`-` to physical pin 6.
+3. Adapter `DATA`/`S` to physical pin 7.
+4. Photograph the complete adapter and GPIO wiring for review.
+5. Confirm VCC is **not** connected to either neighboring 5 V pin 2 or 4.
+6. Leave the metal probe at room temperature for the first test.
 
 ## Enable and test the temperature sensor
 
@@ -253,16 +227,20 @@ ls /sys/bus/w1/devices/28-*/w1_slave
 ## OLED wiring
 
 Add the OLED only after the sensor works. Shut down and unplug the Pi first.
-The sensor and OLED may share the breadboard power and ground rails. The OLED
-stays outside the fridge beside the Pi; only the waterproof temperature probe
-goes inside.
+The OLED connects directly to separate Pi power and ground pins so no
+breadboard or wire splitting is necessary. Only the waterproof metal probe
+goes inside the fridge.
 
-| OLED pin | Breadboard/Pi connection | Physical pin |
+| OLED pin | Raspberry Pi connection | Physical pin |
 |---|---|---:|
-| VCC | 3.3 V positive rail | 1 |
-| GND | Ground rail | 6 |
+| VCC | 3.3 V | 17 |
+| GND | Ground | 9 |
 | SDA | GPIO2 / SDA | 3 |
 | SCL | GPIO3 / SCL | 5 |
+
+Use four female-to-female jumpers and follow the labels printed on the OLED;
+OLED pin order varies between boards. Photograph the complete wiring before
+applying power. Never use a 5 V pin for this build.
 
 Enable I2C with `sudo raspi-config`, reboot, and check:
 
@@ -390,8 +368,8 @@ not overwrite the Pi's inventory and temperature history.
 - [ ] Prove the DS18B20 reports a sensible room temperature before using the fridge.
 - [ ] Position the sensor probe safely inside the fridge without crushing its wire.
 - [ ] Confirm the door gasket still seals around the probe cable.
-- [ ] Add a drip loop and secure the cable so it cannot pull on the breadboard.
-- [ ] Keep the Pi, power supply, breadboard, resistor, OLED, and scanner outside moisture and condensation.
+- [ ] Add a drip loop and secure the cable so it cannot pull on the probe adapter.
+- [ ] Keep the Pi, power supply, probe adapter, OLED, and scanner outside moisture and condensation.
 - [ ] Keep the outside parts together on a dry portable tray, plate, or ventilated enclosure; no fridge glue is required.
 - [ ] Compare the sensor with another thermometer if one is available.
 - [ ] Run a several-hour temperature logging test without errors or unsafe heat/moisture.

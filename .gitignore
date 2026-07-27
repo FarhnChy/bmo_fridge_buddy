@@ -15,3 +15,6 @@ venv/
 .env
 .idea/
 .vscode/
+
+# Local hardware inspection photos
+.tmp_hardware_photos/
