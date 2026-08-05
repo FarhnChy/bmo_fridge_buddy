@@ -10,7 +10,8 @@ more useful.
 
 The finished project will:
 
-- Read the fridge temperature with a waterproof DS18B20 sensor.
+- Read the fridge temperature with a Gikfun EK1183 waterproof DS18B20 probe and
+  adapter module.
 - Show a BMO face, temperature, and fridge status on an OLED screen.
 - Report whether the fridge is too cold, normal, or too warm.
 - Accept barcodes typed manually, scanned with a phone, or scanned from an
