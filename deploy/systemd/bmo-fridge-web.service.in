@@ -1,0 +1,16 @@
+[Unit]
+Description=BMO Fridge phone web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@BMO_USER@
+WorkingDirectory=@PROJECT_DIR@
+EnvironmentFile=-/etc/default/bmo-fridge
+ExecStart=@PROJECT_DIR@/.venv/bin/python @PROJECT_DIR@/web_app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

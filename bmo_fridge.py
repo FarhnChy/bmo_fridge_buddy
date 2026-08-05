@@ -5,7 +5,6 @@ What it does:
 - Stores scanned food inventory in SQLite.
 - Logs temperature history to CSV.
 - Lets a USB barcode scanner act like keyboard input.
-- Lets a phone add or scan barcodes through a local web page.
 - Looks up product names with the Open Food Facts API.
 """
 
@@ -14,10 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 import csv
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-import socket
 import sqlite3
 import threading
 import time
@@ -27,6 +23,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+import os
 
 
 APP_NAME = "BMO Fridge"
@@ -42,263 +39,30 @@ EXPIRATION_CHECK_SECONDS = 30
 EXPIRING_SOON_DAYS = 3
 FRIDGE_MIN_F = 32.0
 FRIDGE_MAX_F = 40.0
-PHONE_SCANNER_HOST = "0.0.0.0"
-PHONE_SCANNER_PORT = 8080
 
 # Open Food Facts asks API users to send a custom User-Agent with contact info.
 OPEN_FOOD_FACTS_USER_AGENT = f"BMOFridge/{APP_VERSION} (https://github.com/FarhnChy/bmo_fridge_buddy)"
-OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
-
-PHONE_SCANNER_PAGE = """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BMO Fridge Scanner</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #102521;
-      color: #f7fffb;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(180deg, #0d2a26, #12201e);
-    }
-
-    main {
-      max-width: 520px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    h1 {
-      margin: 0 0 6px;
-      font-size: 28px;
-      font-weight: 750;
-    }
-
-    .status {
-      min-height: 24px;
-      margin: 0 0 16px;
-      color: #b7d8d1;
-      font-size: 15px;
-    }
-
-    video {
-      display: block;
-      width: 100%;
-      aspect-ratio: 4 / 3;
-      border: 1px solid #315b54;
-      border-radius: 8px;
-      background: #07120f;
-      object-fit: cover;
-    }
-
-    label {
-      display: block;
-      margin: 16px 0 6px;
-      color: #d8eee9;
-      font-weight: 650;
-    }
-
-    input {
-      box-sizing: border-box;
-      width: 100%;
-      min-height: 46px;
-      border: 1px solid #47736b;
-      border-radius: 6px;
-      padding: 10px 12px;
-      background: #f7fffb;
-      color: #0b1715;
-      font-size: 18px;
-    }
-
-    button {
-      min-height: 46px;
-      border: 0;
-      border-radius: 6px;
-      padding: 10px 14px;
-      background: #78e0c2;
-      color: #081412;
-      font-size: 16px;
-      font-weight: 750;
-    }
-
-    button.secondary {
-      background: #d5e7e3;
-    }
-
-    .buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .message {
-      min-height: 24px;
-      margin-top: 16px;
-      color: #c9fff0;
-      font-weight: 650;
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>BMO Fridge</h1>
-    <p id="status" class="status">Loading...</p>
-
-    <video id="preview" muted playsinline></video>
-
-    <form id="scan-form">
-      <label for="barcode">Barcode</label>
-      <input id="barcode" name="barcode" inputmode="numeric" autocomplete="off" required>
-
-      <label for="expires">Expiration date</label>
-      <input id="expires" name="expires" type="date">
-
-      <div class="buttons">
-        <button id="camera-button" type="button">Scan</button>
-        <button class="secondary" type="submit">Add</button>
-      </div>
-    </form>
-
-    <p id="message" class="message"></p>
-  </main>
-
-  <script>
-    const video = document.getElementById("preview");
-    const form = document.getElementById("scan-form");
-    const barcodeInput = document.getElementById("barcode");
-    const expiresInput = document.getElementById("expires");
-    const statusText = document.getElementById("status");
-    const messageText = document.getElementById("message");
-    const cameraButton = document.getElementById("camera-button");
-    let stream = null;
-    let scanning = false;
-
-    async function refreshStatus() {
-      try {
-        const response = await fetch("/api/status");
-        const status = await response.json();
-        const temp = status.temperature_f === null ? "--.- F" : `${status.temperature_f.toFixed(1)} F`;
-        statusText.textContent = `${temp} | ${status.temperature_status} | ${status.inventory_count} items`;
-      } catch {
-        statusText.textContent = "BMO status unavailable";
-      }
-    }
-
-    function stopCamera() {
-      scanning = false;
-      if (stream) {
-        for (const track of stream.getTracks()) {
-          track.stop();
-        }
-      }
-      stream = null;
-      cameraButton.textContent = "Scan";
-    }
-
-    async function startCamera() {
-      if (!("BarcodeDetector" in window)) {
-        messageText.textContent = "This browser cannot scan here. Type the barcode instead.";
-        return;
-      }
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false
-        });
-        video.srcObject = stream;
-        await video.play();
-      } catch {
-        messageText.textContent = "Camera did not open. Type the barcode instead.";
-        return;
-      }
-
-      let detector;
-      try {
-        detector = new BarcodeDetector({
-          formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"]
-        });
-      } catch {
-        messageText.textContent = "This browser cannot scan here. Type the barcode instead.";
-        stopCamera();
-        return;
-      }
-
-      scanning = true;
-      cameraButton.textContent = "Stop";
-      messageText.textContent = "Point the camera at the barcode.";
-
-      while (scanning) {
-        try {
-          const codes = await detector.detect(video);
-          if (codes.length > 0) {
-            barcodeInput.value = codes[0].rawValue;
-            messageText.textContent = `Found ${codes[0].rawValue}`;
-            stopCamera();
-            break;
-          }
-        } catch {
-          messageText.textContent = "Scanning stopped. Type the barcode instead.";
-          stopCamera();
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 400));
-      }
-    }
-
-    cameraButton.addEventListener("click", () => {
-      if (scanning) {
-        stopCamera();
-      } else {
-        startCamera();
-      }
-    });
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      stopCamera();
-      messageText.textContent = "Adding item...";
-
-      try {
-        const response = await fetch("/api/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            barcode: barcodeInput.value,
-            expires_on: expiresInput.value
-          })
-        });
-        const result = await response.json();
-        messageText.textContent = result.message;
-        if (result.ok) {
-          barcodeInput.value = "";
-          expiresInput.value = "";
-          barcodeInput.focus();
-          refreshStatus();
-        }
-      } catch {
-        messageText.textContent = "Could not reach BMO.";
-      }
-    });
-
-    refreshStatus();
-    setInterval(refreshStatus, 5000);
-  </script>
-</body>
-</html>
-"""
+OPEN_FOOD_FACTS_URL = (
+    "https://world.openfoodfacts.org/api/v3.6/product/{barcode}.json"
+    "?fields=code,product_name,product_name_en,generic_name,"
+    "abbreviated_product_name,brands,image_front_small_url"
+)
 
 
 def celsius_to_fahrenheit(temperature_c: float) -> float:
     return (temperature_c * (9 / 5)) + 32
+
+
+def get_bmo_mood(temperature_c: float | None) -> str:
+    """Return the face mood shared by the OLED and phone interface."""
+
+    status = classify_temperature_status(temperature_c)
+    return {
+        "No sensor": "sleepy",
+        "Too Cold!": "cold",
+        "Normal": "happy",
+        "Too Warm!": "worried",
+    }[status]
 
 
 @dataclass
@@ -337,6 +101,7 @@ class BmoDisplay:
 
     def __init__(self) -> None:
         self.hardware_ready = False
+        self.last_terminal_status: str | None = None
         self.display = None
         self.image = None
         self.draw = None
@@ -368,15 +133,19 @@ class BmoDisplay:
             temperature_f = celsius_to_fahrenheit(temperature)
             temp_text = f"{temperature_f:.1f} F"
         temp_status = classify_temperature_status(temperature)
+        mood = get_bmo_mood(temperature)
         message = str(state["last_message"])[:22]
         inventory_count = state["inventory_count"]
         expiring_count = state["expiring_count"]
 
         if not self.hardware_ready:
-            print(
+            terminal_status = (
                 f"[BMO] temp={temp_text} items={inventory_count} "
-                f"expiring={expiring_count} status={temp_status} msg={message}"
+                f"expiring={expiring_count} status={temp_status} mood={mood} msg={message}"
             )
+            if terminal_status != self.last_terminal_status:
+                print(terminal_status)
+                self.last_terminal_status = terminal_status
             return
 
         assert self.display is not None
@@ -386,17 +155,34 @@ class BmoDisplay:
 
         self.draw.rectangle((0, 0, 127, 63), outline=0, fill=0)
 
-        # Simple BMO face: eyes, smile, then status text below it.
-        self.draw.rectangle((8, 8, 30, 26), outline=255, fill=0)
-        self.draw.rectangle((98, 8, 120, 26), outline=255, fill=0)
-        self.draw.arc((44, 12, 84, 42), 20, 160, fill=255)
+        self.draw_bmo_face(mood)
 
-        self.draw.text((0, 36), f"{temp_text} {temp_status}", font=self.font, fill=255)
-        self.draw.text((0, 46), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
-        self.draw.text((0, 56), message, font=self.font, fill=255)
+        self.draw.text((0, 33), f"{temp_text} {temp_status}", font=self.font, fill=255)
+        self.draw.text((0, 43), f"Items: {inventory_count}  Soon: {expiring_count}", font=self.font, fill=255)
+        self.draw.text((0, 53), message, font=self.font, fill=255)
 
         self.display.image(self.image)
         self.display.show()
+
+    def draw_bmo_face(self, mood: str) -> None:
+        assert self.draw is not None
+
+        if mood == "sleepy":
+            self.draw.line((10, 12, 30, 12), fill=255, width=2)
+            self.draw.line((98, 12, 118, 12), fill=255, width=2)
+            self.draw.line((52, 25, 76, 25), fill=255, width=2)
+        elif mood == "cold":
+            self.draw.rectangle((14, 8, 27, 19), outline=255, fill=0)
+            self.draw.rectangle((101, 8, 114, 19), outline=255, fill=0)
+            self.draw.line((48, 25, 56, 20, 64, 25, 72, 20, 80, 25), fill=255, width=2)
+        elif mood == "worried":
+            self.draw.ellipse((10, 5, 31, 23), outline=255, fill=0)
+            self.draw.ellipse((97, 5, 118, 23), outline=255, fill=0)
+            self.draw.arc((48, 20, 80, 38), 200, 340, fill=255, width=2)
+        else:
+            self.draw.rectangle((10, 6, 30, 22), outline=255, fill=0)
+            self.draw.rectangle((98, 6, 118, 22), outline=255, fill=0)
+            self.draw.arc((48, 12, 80, 29), 20, 160, fill=255, width=2)
 
 
 @contextmanager
@@ -422,11 +208,20 @@ def connect_db() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     with connect_db() as connection:
+        existing_table = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'inventory'"
+        ).fetchone()
+
+        # Version 0.1 allowed only one row per barcode. Migrate it in place so
+        # different cartons of the same product can keep different dates.
+        if existing_table and "barcode TEXT NOT NULL UNIQUE" in existing_table["sql"]:
+            connection.execute("ALTER TABLE inventory RENAME TO inventory_legacy")
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                barcode TEXT NOT NULL UNIQUE,
+                barcode TEXT NOT NULL,
                 name TEXT NOT NULL,
                 quantity INTEGER NOT NULL DEFAULT 1,
                 expires_on TEXT,
@@ -435,9 +230,31 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS inventory_barcode_expiration
+            ON inventory (barcode, COALESCE(expires_on, ''))
+            """
+        )
+
+        if existing_table and "barcode TEXT NOT NULL UNIQUE" in existing_table["sql"]:
+            connection.execute(
+                """
+                INSERT INTO inventory
+                    (barcode, name, quantity, expires_on, created_at, updated_at)
+                SELECT barcode, name, quantity, expires_on, created_at, updated_at
+                FROM inventory_legacy
+                """
+            )
+            connection.execute("DROP TABLE inventory_legacy")
 
 
-def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
+def add_or_update_item(
+    barcode: str,
+    name: str,
+    expires_on: str | None,
+    quantity: int = 1,
+) -> str:
     """
     Insert a new item or add one to the quantity if the barcode already exists.
     """
@@ -445,39 +262,43 @@ def add_or_update_item(barcode: str, name: str, expires_on: str | None) -> str:
     now = datetime.now().isoformat(timespec="seconds")
     with connect_db() as connection:
         existing = connection.execute(
-            "SELECT quantity FROM inventory WHERE barcode = ?",
-            (barcode,),
+            "SELECT quantity FROM inventory WHERE barcode = ? AND expires_on IS ?",
+            (barcode, expires_on),
         ).fetchone()
 
         if existing:
             connection.execute(
                 """
                 UPDATE inventory
-                SET quantity = quantity + 1,
+                SET quantity = quantity + ?,
                     name = ?,
-                    expires_on = COALESCE(?, expires_on),
                     updated_at = ?
-                WHERE barcode = ?
+                WHERE barcode = ? AND expires_on IS ?
                 """,
-                (name, expires_on, now, barcode),
+                (quantity, name, now, barcode, expires_on),
             )
-            quantity = int(existing["quantity"]) + 1
-            return f"Added one more {name} (qty {quantity})"
+            new_quantity = int(existing["quantity"]) + quantity
+            return f"Added {quantity} {name} (qty {new_quantity})"
 
         connection.execute(
             """
             INSERT INTO inventory (barcode, name, quantity, expires_on, created_at, updated_at)
-            VALUES (?, ?, 1, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (barcode, name, expires_on, now, now),
+            (barcode, name, quantity, expires_on, now, now),
         )
-        return f"Added {name}"
+        return f"Added {quantity} {name}"
 
 
 def remove_one_item(barcode: str) -> str:
     with connect_db() as connection:
         item = connection.execute(
-            "SELECT name, quantity FROM inventory WHERE barcode = ?",
+            """
+            SELECT id, name, quantity FROM inventory
+            WHERE barcode = ?
+            ORDER BY expires_on IS NULL, expires_on, id
+            LIMIT 1
+            """,
             (barcode,),
         ).fetchone()
 
@@ -490,21 +311,82 @@ def remove_one_item(barcode: str) -> str:
                 UPDATE inventory
                 SET quantity = quantity - 1,
                     updated_at = ?
-                WHERE barcode = ?
+                WHERE id = ?
                 """,
-                (datetime.now().isoformat(timespec="seconds"), barcode),
+                (datetime.now().isoformat(timespec="seconds"), item["id"]),
             )
             return f"Removed one {item['name']}"
 
-        connection.execute("DELETE FROM inventory WHERE barcode = ?", (barcode,))
+        connection.execute("DELETE FROM inventory WHERE id = ?", (item["id"],))
         return f"Removed {item['name']}"
+
+
+def remove_item_by_id(item_id: int, remove_all: bool = False) -> str | None:
+    """Remove one unit (or a whole dated batch) for the web interface."""
+
+    with connect_db() as connection:
+        item = connection.execute(
+            "SELECT id, name, quantity FROM inventory WHERE id = ?",
+            (item_id,),
+        ).fetchone()
+        if item is None:
+            return None
+
+        if int(item["quantity"]) > 1 and not remove_all:
+            connection.execute(
+                """
+                UPDATE inventory
+                SET quantity = quantity - 1, updated_at = ?
+                WHERE id = ?
+                """,
+                (datetime.now().isoformat(timespec="seconds"), item_id),
+            )
+            return f"Removed one {item['name']}"
+
+        connection.execute("DELETE FROM inventory WHERE id = ?", (item_id,))
+        return f"Removed {item['name']}"
+
+
+def update_item_by_id(
+    item_id: int,
+    barcode: str,
+    name: str,
+    quantity: int,
+    expires_on: str | None,
+) -> str | None:
+    """Update one dated inventory batch from the web interface."""
+
+    with connect_db() as connection:
+        existing = connection.execute(
+            "SELECT id FROM inventory WHERE id = ?",
+            (item_id,),
+        ).fetchone()
+        if existing is None:
+            return None
+
+        connection.execute(
+            """
+            UPDATE inventory
+            SET barcode = ?, name = ?, quantity = ?, expires_on = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                barcode,
+                name,
+                quantity,
+                expires_on,
+                datetime.now().isoformat(timespec="seconds"),
+                item_id,
+            ),
+        )
+        return f"Updated {name}"
 
 
 def list_inventory(limit: int = 10) -> list[sqlite3.Row]:
     with connect_db() as connection:
         return connection.execute(
             """
-            SELECT barcode, name, quantity, expires_on
+            SELECT id, barcode, name, quantity, expires_on
             FROM inventory
             ORDER BY expires_on IS NULL, expires_on, name
             LIMIT ?
@@ -537,7 +419,7 @@ def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:
     with connect_db() as connection:
         return connection.execute(
             """
-            SELECT barcode, name, quantity, expires_on
+            SELECT id, barcode, name, quantity, expires_on
             FROM inventory
             WHERE expires_on IS NOT NULL
               AND date(expires_on) <= date(?)
@@ -547,7 +429,7 @@ def get_expiring_items(days: int = EXPIRING_SOON_DAYS) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def fetch_product_name(barcode: str) -> str:
+def fetch_product_details(barcode: str) -> dict[str, object]:
     """
     Ask Open Food Facts for a product name.
 
@@ -570,7 +452,7 @@ def fetch_product_name(barcode: str) -> str:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         print(f"[api] Open Food Facts lookup failed: {exc}")
-        return f"Unknown item {barcode}"
+        return {"found": False, "name": f"Unknown item {barcode}", "image_url": None}
 
     product = payload.get("product") or {}
     product_name = (
@@ -582,10 +464,21 @@ def fetch_product_name(barcode: str) -> str:
     brands = product.get("brands")
 
     if product_name and brands:
-        return f"{brands} {product_name}".strip()
-    if product_name:
-        return str(product_name).strip()
-    return f"Unknown item {barcode}"
+        name = f"{brands} {product_name}".strip()
+    elif product_name:
+        name = str(product_name).strip()
+    else:
+        name = f"Unknown item {barcode}"
+
+    return {
+        "found": bool(product_name),
+        "name": name,
+        "image_url": product.get("image_front_small_url"),
+    }
+
+
+def fetch_product_name(barcode: str) -> str:
+    return str(fetch_product_details(barcode)["name"])
 
 
 def parse_expiration_date(raw_value: str) -> str | None:
@@ -654,117 +547,40 @@ def log_temperature(timestamp: datetime, temperature_c: float | None) -> None:
         )
 
 
-def add_scanned_item(barcode: str, expires_on: str | None, state: AppState) -> str:
-    product_name = fetch_product_name(barcode)
-    message = add_or_update_item(barcode, product_name, expires_on)
-    print(message)
-    state.set_message(message)
-    update_counts(state)
-    return message
+def read_temperature_history(hours: int = 24, limit: int = 1000) -> list[dict[str, object]]:
+    """Read valid recent sensor values without modifying the temperature log."""
 
+    if not TEMP_LOG_PATH.exists():
+        return []
 
-def make_phone_scanner_handler(state: AppState) -> type[BaseHTTPRequestHandler]:
-    class PhoneScannerHandler(BaseHTTPRequestHandler):
-        server_version = "BMOFridgeHTTP/0.1"
-
-        def do_GET(self) -> None:
-            if self.path in {"/", "/index.html"}:
-                self.send_text(PHONE_SCANNER_PAGE, "text/html; charset=utf-8")
-                return
-
-            if self.path == "/api/status":
-                snapshot = state.snapshot()
-                raw_temperature_c = snapshot["last_temperature_c"]
-                temperature_c = None if raw_temperature_c is None else float(raw_temperature_c)
-                temperature_f = None if temperature_c is None else celsius_to_fahrenheit(temperature_c)
-                self.send_json(
+    cutoff = datetime.now() - timedelta(hours=hours)
+    points: list[dict[str, object]] = []
+    try:
+        with TEMP_LOG_PATH.open(newline="", encoding="utf-8") as csv_file:
+            for row in csv.DictReader(csv_file):
+                raw_timestamp = (row.get("timestamp") or "").strip()
+                raw_temperature = (row.get("temperature_c") or "").strip()
+                if not raw_timestamp or not raw_temperature:
+                    continue
+                try:
+                    timestamp = datetime.fromisoformat(raw_timestamp)
+                    temperature_c = float(raw_temperature)
+                except ValueError:
+                    continue
+                if timestamp < cutoff:
+                    continue
+                points.append(
                     {
-                        "ok": True,
-                        "message": snapshot["last_message"],
-                        "temperature_f": temperature_f,
-                        "temperature_status": classify_temperature_status(temperature_c),
-                        "inventory_count": snapshot["inventory_count"],
-                        "expiring_count": snapshot["expiring_count"],
+                        "timestamp": timestamp.isoformat(timespec="seconds"),
+                        "temperature_c": round(temperature_c, 3),
+                        "temperature_f": round(celsius_to_fahrenheit(temperature_c), 1),
+                        "status": classify_temperature_status(temperature_c),
                     }
                 )
-                return
-
-            self.send_json({"ok": False, "message": "Not found"}, HTTPStatus.NOT_FOUND)
-
-        def do_POST(self) -> None:
-            if self.path != "/api/scan":
-                self.send_json({"ok": False, "message": "Not found"}, HTTPStatus.NOT_FOUND)
-                return
-
-            try:
-                content_length = int(self.headers.get("Content-Length", "0"))
-                payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
-            except (ValueError, json.JSONDecodeError):
-                self.send_json({"ok": False, "message": "Bad request"}, HTTPStatus.BAD_REQUEST)
-                return
-
-            barcode = str(payload.get("barcode") or "").strip()
-            raw_expiration = str(payload.get("expires_on") or "").strip()
-
-            if not barcode:
-                self.send_json({"ok": False, "message": "Enter a barcode"}, HTTPStatus.BAD_REQUEST)
-                return
-
-            expires_on = parse_expiration_date(raw_expiration)
-            if raw_expiration and expires_on is None:
-                self.send_json({"ok": False, "message": "Use expiration format YYYY-MM-DD"}, HTTPStatus.BAD_REQUEST)
-                return
-
-            message = add_scanned_item(barcode, expires_on, state)
-            self.send_json({"ok": True, "message": message})
-
-        def send_text(self, body: str, content_type: str, status: HTTPStatus = HTTPStatus.OK) -> None:
-            encoded_body = body.encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(encoded_body)))
-            self.end_headers()
-            self.wfile.write(encoded_body)
-
-        def send_json(self, body: dict[str, object], status: HTTPStatus = HTTPStatus.OK) -> None:
-            encoded_body = json.dumps(body).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(encoded_body)))
-            self.end_headers()
-            self.wfile.write(encoded_body)
-
-        def log_message(self, format: str, *args: object) -> None:
-            print(f"[phone] {self.address_string()} - {format % args}")
-
-    return PhoneScannerHandler
-
-
-def get_local_ip_address() -> str:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
-            probe.connect(("8.8.8.8", 80))
-            return str(probe.getsockname()[0])
-    except OSError:
-        return socket.gethostbyname(socket.gethostname())
-
-
-def start_phone_scanner_server(state: AppState) -> ThreadingHTTPServer | None:
-    try:
-        server = ThreadingHTTPServer(
-            (PHONE_SCANNER_HOST, PHONE_SCANNER_PORT),
-            make_phone_scanner_handler(state),
-        )
     except OSError as exc:
-        print(f"[phone] Web scanner unavailable: {exc}")
-        return None
-
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    local_ip = get_local_ip_address()
-    print(f"[phone] Open http://{local_ip}:{PHONE_SCANNER_PORT} on your phone")
-    print(f"[phone] Or try http://raspberrypi.local:{PHONE_SCANNER_PORT}")
-    return server
+        print(f"[history] Could not read temperature log: {exc}")
+        return []
+    return points[-limit:]
 
 
 def print_help() -> None:
@@ -777,11 +593,11 @@ def print_help() -> None:
     print("  help                show this help")
     print("  quit                stop the program")
     print()
-    print(f"Phone scanner: open http://<pi-ip-address>:{PHONE_SCANNER_PORT}")
-    print()
 
 
 def handle_barcode_scan(barcode: str, state: AppState) -> None:
+    product_name = fetch_product_name(barcode)
+
     while True:
         try:
             raw_expiration = input("Expiration date YYYY-MM-DD, or blank: ")
@@ -795,7 +611,9 @@ def handle_barcode_scan(barcode: str, state: AppState) -> None:
         if not raw_expiration.strip() or expires_on is not None:
             break
 
-    add_scanned_item(barcode, expires_on, state)
+    message = add_or_update_item(barcode, product_name, expires_on)
+    print(message)
+    state.set_message(message)
 
 
 def scanner_listener(state: AppState) -> None:
@@ -873,14 +691,14 @@ def main() -> None:
     init_db()
     state = AppState()
     display = BmoDisplay()
-    phone_server = start_phone_scanner_server(state)
 
-    listener = threading.Thread(
-        target=scanner_listener,
-        args=(state,),
-        daemon=True,
-    )
-    listener.start()
+    if os.environ.get("BMO_TERMINAL_INPUT", "1") != "0":
+        listener = threading.Thread(
+            target=scanner_listener,
+            args=(state,),
+            daemon=True,
+        )
+        listener.start()
 
     next_temperature_log = 0.0
     next_expiration_check = 0.0
@@ -909,9 +727,6 @@ def main() -> None:
     except KeyboardInterrupt:
         state.set_message("BMO shutting down")
     finally:
-        if phone_server is not None:
-            phone_server.shutdown()
-            phone_server.server_close()
         print(f"{APP_NAME} stopped.")
 
 

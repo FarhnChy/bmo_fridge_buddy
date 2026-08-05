@@ -1,0 +1,16 @@
+[Unit]
+Description=BMO Fridge temperature monitor and OLED
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@BMO_USER@
+WorkingDirectory=@PROJECT_DIR@
+Environment=BMO_TERMINAL_INPUT=0
+ExecStart=@PROJECT_DIR@/.venv/bin/python @PROJECT_DIR@/bmo_fridge.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

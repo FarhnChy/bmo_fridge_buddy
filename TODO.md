@@ -1,41 +1,36 @@
-# BMO Fridge Buddy: Step-By-Step Build Plan
+# BMO Fridge Buddy: Setup and TODO
 
-This checklist is the current build guide for finishing BMO Fridge Buddy with
-the Gikfun DS18B20 temperature probe kit, Raspberry Pi, breadboard, phone entry,
-barcode/inventory features, and the OLED screen.
+This file contains the remaining project plan, hardware instructions, test
+steps, and commands needed to finish the project.
 
-## What To Do Next
+## Start here: remaining hardware work
 
-Do these in order. Do not connect the OLED until the temperature probe works.
+The software is implemented. The remaining goal is to connect and prove one
+pluggable DS18B20 probe and one OLED on the Raspberry Pi 5, then run the final
+hardware and application checks. Work through these checkpoints in order:
 
-1. Shut down and unplug the Pi.
-2. Plug one Gikfun waterproof probe into one Gikfun adapter board.
-3. Use the breadboard as the shared power hub:
-   - Pi `3.3V`, physical pin `1` -> breadboard `3.3V` / `+` row
-   - Pi `GND`, physical pin `6` -> breadboard `GND` / `-` row
-4. Connect the Gikfun adapter:
-   - `+` / `VCC` -> breadboard `3.3V` / `+` row
-   - `-` / `GND` -> breadboard `GND` / `-` row
-   - `S` / `DATA` -> Pi `GPIO4`, physical pin `7`
-5. Power the Pi back on.
-6. Enable 1-Wire with `sudo raspi-config`, then reboot.
-7. Confirm the probe appears with `ls /sys/bus/w1/devices/28-*/w1_slave`.
-8. Run `python bmo_fridge.py` and confirm it shows a real temperature.
-9. Test barcode entry from the terminal and phone page.
-10. Connect and test the OLED using the same breadboard power rows.
-11. Mount the probe and electronics safely.
+1. **Inspect the pluggable probe kit:** Photograph the probe plug, adapter
+   labels, and both sides of the adapter. Confirm it has an onboard pull-up
+   resistor before connecting anything.
+2. **Temperature sensor only:** With power disconnected, plug the probe into
+   its adapter and connect the adapter directly to three Pi GPIO pins. Get the
+   wiring reviewed before applying power. Enable 1-Wire and prove the probe
+   reports a sensible room temperature.
+3. **OLED:** Shut down and unplug again. Connect the OLED directly to four
+   separate Pi GPIO pins, review the wiring, enable I2C, detect the display,
+   and show the BMO face and temperature.
+4. **Complete application test:** Verify temperature logging, OLED statuses,
+   inventory, barcode input, web access, automatic services, and backups.
+5. **Fridge test:** Put only the sealed metal probe inside, route its cable
+   safely, confirm the door seal, and run a several-hour logging test.
 
-The most important change from the old plan: this new Gikfun kit includes an
-adapter module with the pull-up resistor already on the board. Use the adapter
-module and do not add the separate `4.7k` resistor unless you remove the adapter
-and wire the bare probe directly.
+Target build window: Thursday, August 6, 2026, with overflow into Friday,
+August 7 if needed. Do not connect the OLED until the temperature probe works.
 
-## Tomorrow Build Schedule
+The fridge can log temperatures unattended while work continues on another
+project. Never leave an unverified or unstable electrical setup unattended.
 
-Target work window: Thursday, August 6, 2026 morning through late night, with
-overflow into early Friday, August 7 if needed.
-
-### Minimum Finish Line
+### Minimum finish line
 
 By the end of the build session, aim for this working state:
 
@@ -44,316 +39,209 @@ By the end of the build session, aim for this working state:
 - [ ] OLED shows the BMO face and status text.
 - [ ] Phone or terminal barcode entry still works.
 - [ ] Metal probe is inside the fridge.
-- [ ] Pi, breadboard, Gikfun adapter board, and OLED are outside the fridge.
+- [ ] Pi, Gikfun adapter board, and OLED are outside the fridge.
 - [ ] Wires are secured well enough that they do not fall out during normal use.
 
 Do not spend time on automatic startup until the hardware works. Manual startup
-is good enough for the first finished version.
+is good enough for the first finished hardware version.
 
-### Morning: Temperature Probe
+### Parts used in the final build
 
-- [ ] Shut down and unplug the Pi.
-- [ ] Set up the breadboard shared power rows.
-- [ ] Connect only the Gikfun temperature adapter and probe.
-- [ ] Power on the Pi.
-- [ ] Enable 1-Wire with `sudo raspi-config`.
-- [ ] Reboot.
-- [ ] Confirm the probe appears:
+- Raspberry Pi 5 in its case, correct USB-C power supply, and microSD card
+- One pluggable waterproof DS18B20 probe with its matching adapter module
+- Three female-to-female jumper wires for the probe adapter
+- One four-pin I2C SSD1306 OLED
+- Four female-to-female jumper wires for the OLED
+- Keyboard, or a computer that can connect to the Pi through SSH
+- Phone camera for wiring checks and final evidence
+- Optional USB barcode scanner
+- Optional separate fridge thermometer for later accuracy comparison
+- Optional dry plastic tray or non-conductive board to keep the loose parts together
 
-```bash
-ls /sys/bus/w1/devices/28-*/w1_slave
-```
+The mini breadboard, male-to-female jumpers, male-to-male jumpers, and loose
+4.7 kOhm resistors are **not used** when the adapter has a verified onboard
+pull-up resistor. Keep them as spare prototyping parts. The Pi can remain in
+its black case if the GPIO header is accessible. Keep the Pi, adapter, and OLED
+on a dry non-conductive surface outside the fridge.
 
-- [ ] Confirm the probe reports data:
+## Current progress
 
-```bash
-cat /sys/bus/w1/devices/28-*/w1_slave
-```
-
-Goal before lunch: the first command shows a `28-` device and the second command
-shows `YES` plus a `t=` temperature value.
-
-### Afternoon: App With Real Temperature
-
-- [ ] Run the app:
-
-```bash
-cd ~/bmo_fridge_buddy
-source .venv/bin/activate
-python bmo_fridge.py
-```
-
-- [ ] Confirm the terminal shows a real Fahrenheit temperature, not `No sensor`.
-- [ ] Put the probe in the fridge for 10 to 15 minutes.
-- [ ] Confirm the temperature moves toward normal fridge range.
-- [ ] Confirm `temperature_log.csv` receives readings.
-
-### Late Afternoon: OLED
-
-- [ ] Shut down and unplug the Pi.
-- [ ] Add OLED `VCC` to the breadboard `3.3V` / `+` row.
-- [ ] Add OLED `GND` to the breadboard `GND` / `-` row.
-- [ ] Add OLED `SDA` to Pi GPIO2 physical pin `3`.
-- [ ] Add OLED `SCL` to Pi GPIO3 physical pin `5`.
-- [ ] Power on the Pi.
-- [ ] Enable I2C with `sudo raspi-config`.
-- [ ] Reboot.
-- [ ] Install I2C tools if needed:
-
-```bash
-sudo apt install -y i2c-tools
-```
-
-- [ ] Confirm the OLED appears:
-
-```bash
-i2cdetect -y 1
-```
-
-Expected OLED address: usually `3c` or `3d`.
-
-### Evening: Full App Test
-
-- [ ] Install/update Pi dependencies:
-
-```bash
-cd ~/bmo_fridge_buddy
-source .venv/bin/activate
-python -m pip install -r requirements-rpi.txt
-python -m py_compile bmo_fridge.py
-python bmo_fridge.py
-```
-
-- [ ] Confirm OLED shows the BMO face.
-- [ ] Confirm OLED shows the current temperature.
-- [ ] Confirm OLED shows `Too Cold!`, `Normal`, or `Too Warm!`.
-- [ ] Test terminal barcode entry.
-- [ ] Test phone entry from the printed URL.
-- [ ] Run `list`, `expiring`, `remove <barcode>`, and `help`.
-
-### Night: Basic Mounting
-
-- [ ] Keep only the metal probe inside the fridge.
-- [ ] Keep all electronics outside the fridge.
-- [ ] Route the probe cable without sharply pinching it in the door.
-- [ ] Tape or clip the probe around the middle of the fridge area.
-- [ ] Secure jumper wires so they cannot tug loose easily.
-- [ ] Run the app for 30 minutes.
-- [ ] Confirm the temperature changes normally.
-
-### If Time Runs Tight
-
-Prioritize in this order:
-
-1. Temperature probe working.
-2. App reading and logging temperature.
-3. OLED displaying status.
-4. Basic safe mounting.
-5. Barcode workflow check.
-6. Automatic startup.
-
-Automatic startup is optional and should wait until the rest is stable.
-
-## Current Status
-
-- [x] Raspberry Pi boots and fan issue is resolved.
+- [x] Raspberry Pi boots and its fan issue is resolved.
 - [x] Project repository exists on GitHub.
 - [x] Code is cloned onto the Raspberry Pi.
-- [x] Python virtual environment and dependencies are installed.
-- [x] `bmo_fridge.py` runs without hardware connected.
-- [x] Terminal/manual barcode entry works.
-- [x] Invalid expiration dates ask again.
-- [x] Closed terminal input requests a clean shutdown.
-- [x] Phone-friendly barcode entry page runs from the Pi on port 8080.
-- [x] Gikfun DS18B20 temperature probe kit has arrived.
-- [ ] Connect and test the Gikfun DS18B20 temperature probe.
-- [ ] Test all software features with the real temperature probe connected.
-- [ ] Connect and test the SSD1306 OLED screen.
-- [ ] Finish mounting the physical build.
-- [ ] Decide whether the app should start automatically when the Pi boots.
+- [x] Python virtual environment and project dependencies are installed.
+- [x] `bmo_fridge.py` runs in terminal mode without hardware connected.
+- [x] Invalid expiration dates now prompt again.
+- [x] Closed terminal input now requests a clean application shutdown.
+- [x] Phone-friendly inventory web app supports barcode lookup, expiration dates, quantities, and removal.
+- [x] Phone scanner supports live camera scanning over HTTPS and a barcode-photo fallback.
+- [x] Inventory editing and expiration filters are implemented.
+- [x] Barcode recognition is bundled for offline use.
+- [x] Automatic startup, verified daily backups, and private HTTPS setup are implemented.
+- [x] Read-only temperature graphs and shared phone/OLED BMO moods are implemented.
+- [x] Receive the Gikfun pluggable DS18B20 probe-and-adapter kit.
+- [x] Receive and inspect the OLED screens and original bare-wire DS18B20 probes.
+- [ ] Inspect the Gikfun adapter labels and onboard pull-up resistor.
+- [ ] Connect and test the temperature sensor.
+- [ ] Connect and test the OLED.
+- [ ] Verify every BMO expression and the revised layout on the physical OLED.
+- [ ] Test the full inventory workflow and finish the physical build.
+- [ ] Install and verify the automatic services and HTTPS flow on the Raspberry Pi and phone.
 
-## Parts You Have Or Need
+## Selected hardware
 
-Already have:
-
-- Raspberry Pi
-- Pi power supply
-- Breadboard
-- Jumper wires
-- [Gikfun 1M DS18B20 waterproof digital temperature sensor with adapter
-  module, Pack of 3 Sets, EK1183](https://www.amazon.com/dp/B08V93CTM2)
-
-Gikfun EK1183 notes from the listing:
-
-- Style: Industrial waterproof DS18B20 temperature sensor with adapter module
-- Lead length: `1 meter`
-- Item weight: `0.1 kg`
-- Working voltage: `3.3V` to `5VDC`
-- Maximum supply voltage: `5VDC`
-- Output leads: yellow is DATA, red is VCC, black is GND
-- Measuring range: `-55 C` to `125 C`
-- Cable/lead can withstand up to `85 C`
-- Adapter module has the pull-up resistor onboard
-- For this Raspberry Pi project, power it from `3.3V`, not `5V`, because Pi
-  GPIO data pins are not 5V-safe.
-
-Still needed for the full display build:
-
+- Raspberry Pi 5, case with fan, power supply, and microSD card
+- One pluggable waterproof DS18B20 probe and matching adapter module
+- Seven female-to-female jumper wires total: three for the probe and four for
+  the OLED
 - One 0.96-inch, 128x64, SSD1306 I2C OLED with four attached pins
+- Optional USB barcode scanner
 
-Optional:
+Selected parts:
 
-- USB barcode scanner, only if you do not want to type barcodes or use the phone
-- Small case, tape, zip ties, or cable clips to keep electronics away from
-  fridge moisture
+- [Hosyond SSD1306 OLED five-pack](https://www.amazon.com/dp/B0BFD4X6YV)
+- [Gikfun pluggable DS18B20 probes with adapter modules](https://www.amazon.com/dp/B08V93CTM2)
 
-## What Each Hardware Part Does
+The original
+[WWZMDiB bare-wire probe pack](https://www.amazon.com/dp/B0C8J77NJR) is
+electrically compatible, but its fine stranded leads do not stay securely in
+the mini breadboard. Do not tape those leads into place or power that unstable
+connection. Return that pack if practical or keep it only for a future project
+with properly crimped, soldered, or screw-terminal connections.
 
-Raspberry Pi:
+The replacement listing describes a pluggable probe, matching adapter, and an
+onboard pull-up resistor. Verify the actual labels and adapter after delivery;
+do not rely only on listing photos or wire order.
 
-- Runs `bmo_fridge.py`.
-- Reads the temperature probe on GPIO4.
-- Hosts the phone barcode page on port `8080`.
-- Saves inventory to `fridge.db`.
-- Saves temperature history to `temperature_log.csv`.
-- Later, sends display text and the BMO face to the OLED.
+## What goes inside and outside the fridge
 
-Breadboard:
+The Raspberry Pi is not installed inside the fridge. The probe adapter and OLED
+also stay outside. They are ordinary electronics and are not protected from
+condensation.
 
-- Acts as a wiring hub so the Pi, temperature adapter module, and later OLED
-  share the same `3.3V` and `GND` rows without cramped Pi header wiring.
-- Makes the connections easier to change while testing.
-- Is not the brain of the project. It only joins wires together.
-
-Gikfun DS18B20 probe and adapter module:
-
-- The metal probe goes inside the fridge.
-- The little adapter board stays outside the fridge with the Pi and breadboard.
-- The adapter board handles the resistor normally needed by a DS18B20 sensor.
-- The Pi reads it through Linux 1-Wire.
-
-OLED screen:
-
-- Shows the BMO face, temperature, fridge status, inventory count, and expiring
-  count.
-- Uses I2C, which is separate from the temperature sensor.
-
-## Safety Rules
-
-- Always shut down and unplug the Raspberry Pi before moving wires.
-- Use Raspberry Pi physical pin numbers in this guide.
-- Use the Pi's `3.3V` pin for the temperature module, not `5V`.
-- Keep the Pi, breadboard, Gikfun adapter board, and OLED outside the fridge.
-- Only the metal temperature probe should go inside the fridge.
-- Do not crush the sensor cable in the fridge door.
-- Do not put the adapter board or breadboard where condensation can drip on it.
-
-## Stage 1: Update And Check The Pi Software
-
-Do this before wiring, so you know the software is still healthy.
-
-```bash
-cd ~/bmo_fridge_buddy
-git status --short
-source .venv/bin/activate
-python -m py_compile bmo_fridge.py
-python bmo_fridge.py
-```
-
-Expected result before hardware:
-
-- The app starts.
-- The terminal shows the phone URL.
-- Temperature may say `No sensor`.
-- The app should not crash.
-
-Stop the app with:
-
-```text
-quit
-```
-
-## Stage 2: Connect The Gikfun Temperature Probe
-
-Use this stage before connecting the OLED.
-
-The Gikfun kit has two main parts:
-
-- Waterproof metal DS18B20 probe with red/yellow/black wires.
-- Small adapter module board. It may be labeled `S`, `+`, and `-`, or similar.
-
-Plug the probe into the adapter module first. Then wire the adapter module to
-the Pi through the breadboard.
-
-### Recommended Breadboard Layout
-
-Use the breadboard as a shared power hub:
-
-- One row or rail for `3.3V`
-- One row or rail for `GND`
-- Optional: one numbered row for the Gikfun `DATA` signal if that makes the
-  jumper wire easier to place
-
-Example:
-
-```text
-Pi physical pin 1  3.3V  -> breadboard 3.3V/+ row
-Pi physical pin 6  GND   -> breadboard GND/- row
-
-breadboard 3.3V/+ row -> Gikfun adapter +
-breadboard GND/- row  -> Gikfun adapter -
-Pi physical pin 7 GPIO4 -> Gikfun adapter S
-```
-
-### Temperature Module Connections
-
-| Gikfun adapter label | Meaning | Connection |
+| Part | Location | Reason |
 |---|---|---|
-| `+` or `VCC` | Power | Breadboard `3.3V` / `+` row |
-| `-` or `GND` | Ground | Breadboard `GND` / `-` row |
-| `S`, `DAT`, `DQ`, or `DATA` | 1-Wire data | Pi `GPIO4`, physical pin `7` |
+| Waterproof metal DS18B20 probe | Inside the fridge | This is the part that senses the cold air. |
+| DS18B20 cable | Runs from inside to outside | It carries power and temperature data between the probe and Pi. |
+| Raspberry Pi and power supply | Outside the fridge | They must stay dry and need ventilation and mains power. |
+| Probe adapter | Outside, beside the Pi | It connects the probe and provides the required pull-up resistor. |
+| OLED screen | Outside, where it can be viewed | It is not waterproof and displays the temperature read by the inside probe. |
+| Optional USB barcode scanner | Outside | It plugs into the Pi and is used when adding or removing food. |
 
-Important:
+The finished physical arrangement is:
 
-- Do not add a separate `4.7k` resistor when using the Gikfun adapter module.
-- If you ever remove the adapter module and use only the bare probe wires, then
-  add a `4.7k` resistor between DATA and `3.3V`.
-- If your probe wires are exposed directly, use red as VCC, yellow as DATA, and
-  black as GND.
+```text
+INSIDE FRIDGE                     OUTSIDE FRIDGE
 
-## Stage 3: Enable 1-Wire On The Pi
+waterproof metal probe ----cable/plug---- adapter ---- jumper wires ---- Raspberry Pi
+                                             |                              |
+                                   onboard pull-up resistor             USB power
+                                                                            |
+                                                                     OLED and scanner
+```
 
-After wiring the temperature module, power the Pi back on.
+Only the sealed metal probe should be inside. The OLED stays outside so it is
+visible without opening the door and so condensation cannot damage it.
 
-Run:
+The probe does not calculate or display anything itself. It measures
+temperature and sends a digital number along its DATA wire. The Python program
+on the Pi reads that number, decides whether the fridge is too cold, normal, or
+too warm, saves readings, and tells the outside OLED what to draw.
+
+### How the cable leaves the fridge
+
+For a first prototype, gently pass the thin probe cable through the door gasket
+and close the door on it. Check that the gasket still seals and that the cable
+is not pinched, cut, sharply bent, or pulled tight. Make a small downward
+"drip loop" in the cable outside before it reaches the electronics so moisture
+cannot run along the cable toward the Pi.
+
+Do not drill a hole in the fridge. Refrigerant tubes and electrical wiring can
+be hidden in its walls. If the door cannot close and seal safely around the
+cable, stop and choose another non-destructive cable route or a purpose-made
+fridge cable pass-through.
+
+## Why the breadboard is no longer used
+
+The original plan used a breadboard and a loose 4.7 kOhm resistor because the
+original probe ended in three bare wires. Those stranded leads proved too thin
+and flexible to make a secure breadboard connection. Tape is not an acceptable
+electrical connection.
+
+The replacement probe plugs into an adapter module. The adapter provides solid
+header pins and the required pull-up resistor, so it connects directly to the
+Pi with female-to-female jumpers. This removes the breadboard, separate
+resistor, and male-ended jumper wires from the finished design.
+
+## Next steps when the pluggable probe arrives
+
+1. Keep the Raspberry Pi shut down and unplugged.
+2. Photograph the probe plug, adapter labels, and both sides of the adapter.
+3. Confirm the adapter has an onboard pull-up resistor.
+4. Connect and test only the DS18B20 and adapter first.
+5. Enable 1-Wire and confirm the Pi detects the sensor.
+6. Shut down and unplug the Pi again.
+7. Add the OLED using its own power and ground pins.
+8. Enable I2C and confirm the Pi detects the OLED.
+9. Run the complete application and test every feature.
+
+Do not disassemble the Raspberry Pi. All project connections use its exposed
+40-pin GPIO header. Leave the separate four-wire Pi 5 fan connector alone.
+
+## Temperature sensor wiring: adapter directly to Raspberry Pi 5
+
+Always shut down and unplug the Pi before changing wires. First plug the probe
+into its matching adapter. Follow the **printed adapter labels**, not an assumed
+left-to-right order.
+
+| Adapter label | Raspberry Pi connection | Physical pin |
+|---|---|---:|
+| `VCC`, `+`, or `3V3` | 3.3 V power | 1 |
+| `GND` or `-` | Ground | 6 |
+| `DATA`, `DAT`, `DQ`, or `S` | GPIO4 / 1-Wire data | 7 |
+
+Use three female-to-female jumpers. The adapter end fits its male output pins;
+the other end fits over the Pi's male GPIO pins. Do not use the breadboard,
+male-to-female jumpers, male-to-male jumpers, or a separate 4.7 kOhm resistor
+when the adapter's onboard pull-up resistor has been verified.
+
+### Raspberry Pi 5 header orientation
+
+With the GPIO header above the heatsink and the case edge above the header,
+start at the end beside the round yellow mounting hole, away from the fan plug:
+
+```text
+Case edge / outside row
+Pin 2 (5 V)   Pin 4 (5 V)   Pin 6 (GND)   Pin 8
+Pin 1 (3.3 V) Pin 3         Pin 5         Pin 7 (GPIO4)
+Heatsink / inside row
+```
+
+Connect one wire at a time with power disconnected:
+
+1. Adapter `VCC`/`+` to physical pin 1.
+2. Adapter `GND`/`-` to physical pin 6.
+3. Adapter `DATA`/`S` to physical pin 7.
+4. Photograph the complete adapter and GPIO wiring for review.
+5. Confirm VCC is **not** connected to either neighboring 5 V pin 2 or 4.
+6. Leave the metal probe at room temperature for the first test.
+
+## Enable and test the temperature sensor
+
+After checking the wiring, power on the Pi and run:
 
 ```bash
 sudo raspi-config
 ```
 
-Choose:
-
-```text
-Interface Options -> 1-Wire -> Enable
-```
-
-Then reboot:
-
-```bash
-sudo reboot
-```
-
-## Stage 4: Test The Temperature Probe By Itself
-
-After the Pi reboots:
+Choose **Interface Options**, enable **1-Wire**, and reboot. Then check:
 
 ```bash
 ls /sys/bus/w1/devices/28-*/w1_slave
 ```
 
-Expected result:
-
-- A path appears with a folder beginning with `28-`.
+- [ ] A path beginning with `28-` appears.
+- [ ] If no path appears, shut down and recheck wiring before trying again.
 
 Then read the probe:
 
@@ -361,10 +249,8 @@ Then read the probe:
 cat /sys/bus/w1/devices/28-*/w1_slave
 ```
 
-Expected result:
-
-- The first line ends with `YES`.
-- The second line includes `t=` followed by a number.
+- [ ] The first line ends with `YES`.
+- [ ] The second line includes `t=` followed by a number.
 
 Example:
 
@@ -375,288 +261,116 @@ Example:
 
 That example means `4.187 C`, which is about fridge temperature.
 
-If no `28-` path appears:
+## OLED wiring
 
-- Shut down and unplug the Pi.
-- Recheck `+` to pin `1`, `-` to pin `6`, and `S` to pin `7`.
-- Make sure the probe is fully plugged into the Gikfun adapter board.
-- Make sure the adapter board is outside the fridge and dry.
-- Boot again and rerun the `ls` command.
+Add the OLED only after the sensor works. Shut down and unplug the Pi first.
+The OLED connects directly to separate Pi power and ground pins so no
+breadboard or wire splitting is necessary. Only the waterproof metal probe
+goes inside the fridge.
 
-## Stage 5: Run BMO With The Temperature Probe
-
-```bash
-cd ~/bmo_fridge_buddy
-source .venv/bin/activate
-python bmo_fridge.py
-```
-
-Expected result:
-
-- The app starts normally.
-- The terminal prints the phone URL.
-- Temperature changes from `No sensor` to a real Fahrenheit reading.
-- Status becomes one of:
-  - `Too Cold!`
-  - `Normal`
-  - `Too Warm!`
-- `temperature_log.csv` gets new rows every few seconds.
-
-No extra feature setup is needed for temperature. Once the Pi sees the sensor,
-the app automatically reads it, classifies it, and logs it.
-
-## Stage 6: Test Inventory And Barcode Features
-
-Keep the app running.
-
-At the terminal prompt, test manual entry:
-
-```text
-scan> 012345678905
-Expiration date YYYY-MM-DD, or blank: 2026-08-15
-```
-
-Then test commands:
-
-```text
-list
-expiring
-remove 012345678905
-help
-```
-
-Expected result:
-
-- `list` shows saved food items.
-- `expiring` shows items close to expiration.
-- `remove <barcode>` removes or reduces an item.
-- Open Food Facts may fill in product names when the Pi has internet.
-- Unknown barcodes should still save without crashing the app.
-
-Files that should exist after testing:
-
-- [ ] `fridge.db`
-- [ ] `temperature_log.csv`
-
-## Stage 7: Test Phone Entry
-
-When the app starts, it prints a URL like:
-
-```text
-http://192.168.1.25:8080
-```
-
-On a phone connected to the same Wi-Fi as the Pi:
-
-1. Open the printed URL.
-2. Type a barcode.
-3. Enter an expiration date.
-4. Submit it.
-5. Check the Pi terminal with:
-
-```text
-list
-```
-
-Expected result:
-
-- The phone entry adds an item to the same inventory database.
-- The terminal `list` command shows the item.
-
-Notes:
-
-- Typing the barcode on the phone is the reliable path.
-- Camera scanning may depend on browser permissions and whether the phone allows
-  camera access for the page.
-
-## Stage 8: Connect The OLED Screen
-
-Only do this after the temperature probe works.
-
-Shut down first:
-
-```bash
-sudo shutdown now
-```
-
-Unplug the Pi, then add the OLED wiring. Keep the Gikfun temperature adapter
-connected. The OLED uses the same breadboard `3.3V` and `GND` rows.
-
-| OLED pin | Connection | Physical pin |
+| OLED pin | Raspberry Pi connection | Physical pin |
 |---|---|---:|
-| `VCC` | Breadboard `3.3V` / `+` row | Already fed by Pi pin `1` |
-| `GND` | Breadboard `GND` / `-` row | Already fed by Pi pin `6` |
-| `SDA` | Pi GPIO2 / SDA | `3` |
-| `SCL` | Pi GPIO3 / SCL | `5` |
+| VCC | 3.3 V | 17 |
+| GND | Ground | 9 |
+| SDA | GPIO2 / SDA | 3 |
+| SCL | GPIO3 / SCL | 5 |
 
-At this point the shared power rows should have:
+Use four female-to-female jumpers and follow the labels printed on the OLED;
+OLED pin order varies between boards. Photograph the complete wiring before
+applying power. Never use a 5 V pin for this build.
 
-- Pi `3.3V` pin `1`, Gikfun `+`, and OLED `VCC` on the same breadboard
-  `3.3V` / `+` row.
-- Pi `GND` pin `6`, Gikfun `-`, and OLED `GND` on the same breadboard
-  `GND` / `-` row.
-- Gikfun `S` going to Pi `GPIO4` pin `7`.
-- OLED `SDA` going to Pi `GPIO2` pin `3`.
-- OLED `SCL` going to Pi `GPIO3` pin `5`.
-
-## Stage 9: Enable And Test I2C For The OLED
-
-Power the Pi back on.
-
-Run:
-
-```bash
-sudo raspi-config
-```
-
-Choose:
-
-```text
-Interface Options -> I2C -> Enable
-```
-
-Then reboot:
-
-```bash
-sudo reboot
-```
-
-Install the I2C tool if needed:
-
-```bash
-sudo apt install -y i2c-tools
-```
-
-Check the OLED:
+Enable I2C with `sudo raspi-config`, reboot, and check:
 
 ```bash
 i2cdetect -y 1
 ```
 
-Expected result:
+- [ ] The OLED appears, normally at address `3c` or `3d`.
+- [ ] If it does not appear, shut down and recheck VCC, GND, SDA, and SCL.
 
-- The OLED appears at address `3c` or `3d`.
-
-If nothing appears:
-
-- Shut down and unplug the Pi.
-- Recheck `VCC`, `GND`, `SDA`, and `SCL`.
-- Make sure `SDA` and `SCL` are not swapped.
-
-## Stage 10: Run The Full App
+## Run the application on the Pi
 
 ```bash
 cd ~/bmo_fridge_buddy
 source .venv/bin/activate
 python -m pip install -r requirements-rpi.txt
-python -m py_compile bmo_fridge.py
 python bmo_fridge.py
 ```
 
-Confirm:
+Stop it by typing `quit` at the `scan>` prompt or pressing `Ctrl+C`.
 
-- [ ] Terminal shows a real temperature.
-- [ ] OLED shows the BMO face.
-- [ ] OLED shows `Too Cold!`, `Normal`, or `Too Warm!`.
-- [ ] OLED shows inventory count.
-- [ ] OLED shows expiring-soon count.
-- [ ] Phone page opens from another device on the same Wi-Fi.
-- [ ] Phone entry adds an item.
-- [ ] Manual terminal entry adds an item.
-- [ ] `list` shows saved items.
-- [ ] `expiring` works.
-- [ ] `remove <barcode>` works.
+Hardware checks:
+
+- [ ] The terminal shows a real temperature instead of `No sensor`.
+- [ ] The OLED shows the BMO face.
+- [ ] The OLED shows temperature and `Too Cold!`, `Normal`, or `Too Warm!`.
+- [ ] The OLED shows item and expiring-soon counts.
 - [ ] `temperature_log.csv` receives new readings.
 
-## Stage 11: Mount The Physical Build
+Inventory checks:
 
-- [ ] Put only the metal probe inside the fridge.
-- [ ] Keep the Pi, breadboard, adapter module, and OLED outside the fridge.
-- [ ] Route the probe cable so the fridge door does not sharply pinch it.
-- [ ] Tape or clip the probe so it does not sit directly against the freezer
-      plate or wall.
-- [ ] Put the probe around the middle of the fridge area for a better air
-      temperature reading.
-- [ ] Secure loose wires with tape, clips, or zip ties.
-- [ ] Keep electronics away from spills and condensation.
-- [ ] Run the app for at least 30 minutes and confirm the temperature changes
-      normally.
+- [ ] `help` prints the available commands.
+- [ ] Scan/type a barcode and enter an expiration date as `YYYY-MM-DD`.
+- [ ] An invalid date asks again instead of adding the item immediately.
+- [ ] `list` shows the saved item.
+- [ ] `expiring` shows items expiring soon.
+- [ ] `remove <barcode>` reduces the quantity or removes the item.
+- [ ] `quit` closes the application cleanly.
 
-## Stage 12: Daily Use
+## How the barcode scanner works
 
-Start the app:
+A normal USB barcode scanner in keyboard or HID mode does not require a phone
+app. Plug it into the Pi, place the terminal at the `scan>` prompt, and scan a
+package. The scanner types the barcode digits and usually presses Enter just as
+a keyboard would. The program then looks up the product with Open Food Facts,
+asks for an expiration date, and saves it in SQLite.
 
-```bash
-cd ~/bmo_fridge_buddy
-source .venv/bin/activate
-python bmo_fridge.py
-```
+The product barcode normally does not contain its expiration date. For Version
+1, type that date with a keyboard when prompted. A scanner is optional for the
+first hardware test: manually typing the printed barcode tests the same program
+flow.
 
-Use these terminal commands:
+Barcode checks:
 
-```text
-list
-expiring
-remove <barcode>
-help
-quit
-```
+- [ ] Type a real barcode manually and confirm the product lookup/fallback works.
+- [ ] Plug in the scanner and confirm it can type into a plain terminal.
+- [ ] Scan at `scan>` and confirm it submits the complete barcode once.
+- [ ] Enter an expiration date and confirm the item appears in `list`.
+- [ ] Disconnect the internet and confirm an unknown-item fallback is saved.
 
-Use the phone page:
+## Version 1 versus future features
 
-- Open the URL printed by the app.
-- Add food by barcode and expiration date.
-- Check the OLED or terminal for current fridge status.
+Version 1 does not require a mobile app. It is complete when the physical
+sensor, outside OLED, terminal inventory workflow, local database, and CSV log
+work reliably. A monitor/keyboard or SSH connection is acceptable for entering
+expiration dates.
 
-Temperature status:
+The Version 2 phone-friendly web dashboard is implemented for inventory. It
+reuses the Python application and SQLite database, scans barcodes through the
+phone camera, looks up product names, and records quantities and expiration
+dates. Live camera scanning needs trusted HTTPS; the barcode-photo and manual
+entry paths can be tested over ordinary local HTTP. Automatic startup,
+verified rotating backups, a production web server, and a private Tailscale
+HTTPS setup are implemented but still need device-side installation and
+testing. Tailscale provides private-device access in place of a separate BMO
+login. Temperature graphs and alerts remain future improvements.
 
-- Below `32 F`: `Too Cold!`
-- `32 F` through `40 F`: `Normal`
-- Above `40 F`: `Too Warm!`
+### Parked roadmap: only after the hardware prototype works
 
-## Troubleshooting
+Do not let these ideas delay the original BMO hardware goal. First prove the
+real DS18B20, OLED face, temperature status, logging, and inventory workflow.
+After that Version 1 checkpoint, possible Version 2 work includes:
 
-Temperature says `No sensor`:
+- Show a larger animated BMO face and personality in the phone app.
+- Add sustained warm-temperature, disconnected-sensor, and expiration alerts.
+- Finish the installable phone PWA experience with icons and offline guidance.
+- Add a backup restore workflow and a hardware/service health page.
 
-- Confirm 1-Wire is enabled.
-- Confirm the Pi was rebooted after enabling 1-Wire.
-- Confirm the Gikfun adapter `S` pin is connected to GPIO4 physical pin `7`.
-- Confirm Pi physical pin `1` feeds the breadboard `3.3V` / `+` row.
-- Confirm Pi physical pin `6` feeds the breadboard `GND` / `-` row.
-- Confirm adapter `+` is connected to the breadboard `3.3V` / `+` row.
-- Confirm adapter `-` is connected to the breadboard `GND` / `-` row.
-- Try another probe/adapter from the 3-pack.
+The next active milestone remains hardware verification, not these features.
 
-Temperature looks off:
+## Update the Raspberry Pi later
 
-- Let the probe sit in the fridge for 10 to 15 minutes.
-- Compare against another fridge thermometer if available.
-- Expect hobby sensors to be close, but not medical/lab accurate.
-
-Phone page does not open:
-
-- Make sure the phone and Pi are on the same Wi-Fi.
-- Use the exact URL printed by the app.
-- Make sure the app is still running.
-- Try `http://<pi-ip-address>:8080`.
-
-OLED does not show:
-
-- Confirm I2C is enabled.
-- Confirm `i2cdetect -y 1` shows `3c` or `3d`.
-- Confirm OLED `VCC` is connected to the breadboard `3.3V` / `+` row.
-- Confirm OLED `GND` is connected to the breadboard `GND` / `-` row.
-- Recheck `SDA` physical pin `3` and `SCL` physical pin `5`.
-
-Open Food Facts names do not appear:
-
-- Make sure the Pi has internet.
-- Unknown barcodes can still be saved.
-- The app should keep running even if lookup fails.
-
-## Update The Pi Later
-
-After pushing new code from the Windows computer, update the Pi with:
+After pushing new code from the development computer, stop the app on the Pi:
 
 ```bash
 cd ~/bmo_fridge_buddy
@@ -664,24 +378,45 @@ git status --short
 git pull --ff-only
 source .venv/bin/activate
 python -m pip install -r requirements-rpi.txt
-python -m py_compile bmo_fridge.py
-python bmo_fridge.py
+python -m py_compile bmo_fridge.py web_app.py backup_database.py
+python -m unittest discover -s tests -v
+bash scripts/install_pi_services.sh
 ```
 
-If `git status --short` shows Pi-side edits, preserve or commit them before
-pulling. `fridge.db` and `temperature_log.csv` are ignored by Git, so normal
-updates should not overwrite the Pi's inventory and temperature history.
+If `git status` shows Pi-side edits, preserve or commit them before pulling.
+`fridge.db` and `temperature_log.csv` are ignored by Git, so normal updates do
+not overwrite the Pi's inventory and temperature history.
 
-## Publish Changes To GitHub
+## Publish changes to GitHub
 
-On the Windows computer:
+On the Windows development computer:
 
 ```powershell
 git status --short
 git add README.md TODO.md bmo_fridge.py
-git commit -m "Revise hardware setup checklist for Gikfun sensor kit"
+git commit -m "Finish and document BMO Fridge Buddy prototype"
 git push
 ```
 
-Review `git status --short` before committing so unexpected files are not
-included.
+The files will appear on GitHub after the push succeeds. Review `git status`
+before committing so unexpected files are not included.
+
+## Final project checklist
+
+- [ ] Prove the DS18B20 reports a sensible room temperature before using the fridge.
+- [ ] Position the sensor probe safely inside the fridge without crushing its wire.
+- [ ] Confirm the door gasket still seals around the probe cable.
+- [ ] Add a drip loop and secure the cable so it cannot pull on the probe adapter.
+- [ ] Keep the Pi, power supply, probe adapter, OLED, and scanner outside moisture and condensation.
+- [ ] Keep the outside parts together on a dry portable tray, plate, or ventilated enclosure; no fridge glue is required.
+- [ ] Compare the sensor with another thermometer if one is available.
+- [ ] Run a several-hour temperature logging test without errors or unsafe heat/moisture.
+- [ ] Run the complete hardware, inventory, and barcode checklists above.
+- [x] Add optional automatic startup for the monitor and phone web app.
+- [x] Add verified rotating backups for `fridge.db`.
+- [ ] Install and verify automatic startup and backups on the Pi.
+- [ ] Activate and test private Tailscale HTTPS on the Pi and phone.
+- [ ] Take a photo or video of the finished working hardware.
+- [ ] Capture terminal output showing the detected sensor and OLED.
+- [ ] Update README and TODO so they describe what actually worked.
+- [ ] Commit and push the final tested version to GitHub.

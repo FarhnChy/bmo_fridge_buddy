@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up BMO Fridge inventory
+
+[Service]
+Type=oneshot
+User=@BMO_USER@
+WorkingDirectory=@PROJECT_DIR@
+ExecStart=@PROJECT_DIR@/.venv/bin/python @PROJECT_DIR@/backup_database.py --database @PROJECT_DIR@/fridge.db --output @BACKUP_DIR@ --keep 14
