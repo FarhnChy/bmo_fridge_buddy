@@ -1,8 +1,35 @@
 # BMO Fridge Buddy: Final Build TODO
 
-Use this file on Thursday, August 6, 2026. The software is implemented; what
-remains is hardware hookup, real-device testing, service install, and final
-cleanup.
+Use this file when restarting the hardware work, likely Saturday/Sunday. The
+software is implemented; what remains is hardware hookup, real-device testing,
+service install, and final cleanup.
+
+## Weekend Restart Notes
+
+Start with the temperature sensor only. Do not wire the OLED or install
+services until the DS18B20 probe is reading real values from the Pi.
+
+Target outcome for the first session:
+
+- Pi detects a `28-...` 1-Wire device.
+- `cat /sys/bus/w1/devices/28-*/w1_slave` ends with `YES`.
+- The same output includes `t=...`.
+- `python bmo_fridge.py` shows a real Fahrenheit temperature instead of
+  `No sensor`.
+- `temperature_log.csv` gets new rows after the app runs.
+
+Suggested order:
+
+1. Inspect the Gikfun adapter labels and confirm whether it has a pull-up
+   resistor.
+2. Wire only the DS18B20 adapter to 3.3V, GND, and GPIO4.
+3. Enable 1-Wire, reboot, and prove the sensor from `/sys/bus/w1/devices`.
+4. Run the app and confirm logging.
+5. Put only the sealed metal probe in the fridge for 10 to 15 minutes and
+   confirm the reading moves toward fridge range.
+
+Stop before moving on if the Pi does not show a `28-...` device. That means the
+issue is wiring, 1-Wire config, the adapter, or the probe, not the app code.
 
 ## Finish Checklist
 
@@ -20,6 +47,8 @@ cleanup.
    - [ ] Enable 1-Wire with `sudo raspi-config`, then reboot.
    - [ ] Confirm a `28-...` device appears.
    - [ ] Confirm the sensor readout says `YES` and includes `t=`.
+   - [ ] If no `28-...` device appears, re-check adapter labels, jumper wires,
+         and that 1-Wire is enabled before changing Python code.
 
 3. **Run the main app with the real probe**
    - [ ] Start `bmo_fridge.py`.
@@ -78,6 +107,19 @@ Check sensor:
 ```bash
 ls /sys/bus/w1/devices/28-*/w1_slave
 cat /sys/bus/w1/devices/28-*/w1_slave
+```
+
+Enable 1-Wire if needed:
+
+```bash
+sudo raspi-config
+sudo reboot
+```
+
+After reboot, the sensor should appear here:
+
+```bash
+ls /sys/bus/w1/devices/
 ```
 
 Run main app:
